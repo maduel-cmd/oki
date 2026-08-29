@@ -33,3 +33,8 @@ cd oki-family && npm run deploy:netlify
 ```
 
 (האתר כרגע ב־manual deploy; אין קישור Git ב־Netlify UI.)
+
+## Netlify — Git vs CLI
+
+- פריסה פעילה: `npm run deploy:netlify` (CLI)
+- חיבור Git ל־branch `oki-family` הוגדר, אבל clone נכשל בלי אישור Netlify GitHub App לריפו הפרטי — `stop_builds=true` עד שתחברו ב־Netlify UI (Site settings → Build & deploy → Link repository / Authorize).
