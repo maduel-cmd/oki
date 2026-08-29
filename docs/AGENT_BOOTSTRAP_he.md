@@ -78,14 +78,14 @@ LiveKit — רק ב־Supabase Edge secrets, לא ב־Vite.
 
 ### ג׳. Netlify
 
-1. אתר חדש (או העברת `oki-family-maduel`) עם **Base directory = שורש הריפו החדש**.
-2. Build: `npm run build`, publish: `dist`.
-3. העתיקו את משתני ה־env מאתר אוקי הקיים אם כבר קיים.
+**סטטוס בעלים:** אתר קיים `oki-family-maduel` — פריסה מ־`oki-family` (`npm run deploy:netlify`).  
+בלי ריפו GitHub: Continuous Deploy מ־Git לא מחובר; מפריסים ב־CLI.  
+כשיהיה ריפו: Base directory = שורש, build `npm run build`, publish `dist`.
 
 ### ד׳. Supabase
 
-- אפשר **אותו** פרויקט Supabase כמו TrailLink (טבלאות `families*` כבר שם), או פרויקט חדש + הרצת כל המיגרציות ב־`supabase/migrations/`.
-- Edge Function: `family-livekit-token`.
+**סטטוס בעלים:** **אותו** פרויקט כמו TrailLink (טבלאות `families*` כבר שם).  
+Edge Function: `family-livekit-token` + secrets LiveKit.
 
 ### ה׳. TrailLink אחרי הפיצול
 
@@ -96,7 +96,7 @@ LiveKit — רק ב־Supabase Edge secrets, לא ב־Vite.
 ## שאלות נפוצות לבעלים
 
 **האם חובה ריפו GitHub נפרד?**  
-כן, כדי שסוכן Cloud יהיה «לא חלק מ־TrailLink» באמת (הקשר, CI, PR נפרדים).
+רק לסוכן Cloud עצמאי. לפיתוח מקומי + פריסת Netlify ב־CLI — מספיקה התיקייה `oki-family/`.
 
 **אפשר להשאיר את התיקייה ליד TrailLink בלי ריפו?**  
-לפיתוח מקומי כן; לסוכן עצמאי בענן — לא מספיק.
+כן — זה המצב הנוכחי (החלטת בעלים).

@@ -2,22 +2,33 @@
 
 | # | שאלה | בחירה | משמעות |
 | --- | --- | --- | --- |
-| 1 | ריפו GitHub | **ג** — תיקייה מקומית בלבד בינתיים | אין דחיפה ל־GitHub; git מקומי ב־`oki-family/` |
-| 2 | Netlify | **א** — אתר `oki-family-maduel` מהבנייה של `oki-family` | פריסה מ־`oki-family/dist` (CLI); לא מ־`apps/family` |
-| 3 | Supabase | **א** — אותו פרויקט כמו TrailLink | `VITE_SUPABASE_*` הקיימים; טבלאות `families*` |
+| 1 | ריפו GitHub | **ג** → **פתרון ביניים** | אין ריפו נפרד (טוקן הסוכן לא יכול ליצור). יש **ענף `oki-family`** ב־`maduel-cmd/TrailLink` עם תוכן הפרויקט העצמאי בלבד |
+| 2 | Netlify | **א** | אתר `oki-family-maduel` ← בנייה מ־`oki-family` (`npm run deploy:netlify`) |
+| 3 | Supabase | **א** | אותו פרויקט כמו TrailLink |
 
-## פריסת Netlify (מצב נוכחי — בלי ריפו GitHub)
+## GitHub — איך זה נראה בפועל
+
+- ענף: https://github.com/maduel-cmd/TrailLink/tree/oki-family  
+- בשורש הענף: `package.json`, `src/`, `AGENTS.md` (לא מונוריפו TrailLink)
+- דחיפה מקומית:
 
 ```bash
 cd oki-family
-npm run build
-npx netlify-cli deploy --prod --dir dist --site 29a19584-165d-4743-9139-7234676f5680 --no-build
+git push traillink main:oki-family
 ```
 
-או: `npm run deploy:netlify` (אם מוגדר ב־`package.json`).
+### סוכן Cloud על הענף
 
-כשיהיה ריפו GitHub נפרד — לחבר את האתר לאותו ריפו עם Base directory = שורש.
+1. New Agent → ריפו **TrailLink**
+2. Branch / ref: **`oki-family`** (לא `master`)
+3. הדביקו פרומפט מ־`docs/AGENT_BOOTSTRAP_he.md`
 
-## סוכן
+כשיהיה PAT אישי עם הרשאת `repo` — אפשר ליצור `maduel-cmd/oki-family` ולהעביר את ההיסטוריה (`git push` לריפו חדש).
 
-עבודה מקומית על `oki-family/`. סוכן Cloud נפרד — רק אחרי יצירת ריפו GitHub (עדיין לא נעול).
+## פריסת Netlify
+
+```bash
+cd oki-family && npm run deploy:netlify
+```
+
+(האתר כרגע ב־manual deploy; אין קישור Git ב־Netlify UI.)
