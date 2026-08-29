@@ -47,6 +47,17 @@ export type FamilyCompound = {
   createdBy: string;
 };
 
+/**
+ * Manual meetup pin (e.g. «שער 12»). Visible to all family members.
+ * Not GPS tracking — a shared rendezvous label on the map.
+ */
+export type FamilyMeetingPoint = {
+  id: string;
+  name: string;
+  position: LatLng;
+  createdBy: string;
+};
+
 export const MIN_COMPOUND_POINTS = 3;
 
 export type FamilyMemberPresence = {
@@ -73,7 +84,8 @@ export type FamilyAlertKind =
   | 'zone_enter'
   | 'zone_exit'
   | 'location_shared'
-  | 'quiet_blocked';
+  | 'quiet_blocked'
+  | 'meeting_point';
 
 export type FamilyAlert = {
   id: string;

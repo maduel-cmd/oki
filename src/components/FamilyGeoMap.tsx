@@ -1,5 +1,6 @@
 import type {
   FamilyCompound,
+  FamilyMeetingPoint,
   FamilyZone,
   LatLng,
 } from '@oki/domain';
@@ -40,7 +41,7 @@ export type SharedPin = {
   isSelf?: boolean;
 };
 
-export type FamilyMapDrawMode = 'none' | 'zone' | 'compound';
+export type FamilyMapDrawMode = 'none' | 'zone' | 'compound' | 'meetup';
 
 type Props = {
   center: LatLng | null;
@@ -48,6 +49,8 @@ type Props = {
   zones: FamilyZone[];
   /** Parent-only closed enclosures. Pass [] for non-admins. */
   compounds?: FamilyCompound[];
+  /** Manual meetup pins — visible to all family members. */
+  meetingPoints?: FamilyMeetingPoint[];
   /** Vertices while drawing a new compound (not yet closed). */
   draftRing?: LatLng[];
   /** Family members with a known shared/self position — shown as named pins. */
@@ -161,11 +164,16 @@ function escapeHtml(text: string): string {
 
 function createNamedMarkerEl(
   label: string,
-  kind: 'self' | 'member',
+  kind: 'self' | 'member' | 'meetup',
 ): HTMLDivElement {
   const el = document.createElement('div');
-  el.className =
-    kind === 'self' ? 'oki-map-name-marker oki-map-name-marker--self' : 'oki-map-name-marker';
+  if (kind === 'meetup') {
+    el.className = 'oki-map-name-marker oki-map-name-marker--meetup';
+  } else if (kind === 'self') {
+    el.className = 'oki-map-name-marker oki-map-name-marker--self';
+  } else {
+    el.className = 'oki-map-name-marker';
+  }
   el.innerHTML =
     `<span class="oki-map-name-dot" aria-hidden="true"></span>` +
     `<span class="oki-map-name-label">${escapeHtml(label)}</span>`;
@@ -303,6 +311,7 @@ export function FamilyGeoMap({
   self,
   zones,
   compounds = [],
+  meetingPoints = [],
   draftRing = [],
   sharedPins = [],
   connectedWithoutLocation = [],
@@ -315,6 +324,7 @@ export function FamilyGeoMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const memberMarkersRef = useRef<Map<string, Marker>>(new Map());
+  const meetupMarkersRef = useRef<Map<string, Marker>>(new Map());
   const onMapPickRef = useRef(onMapPick);
   const onCompoundClickRef = useRef(onCompoundClick);
   const drawModeRef = useRef(drawMode);
@@ -380,6 +390,8 @@ export function FamilyGeoMap({
       cancelled = true;
       for (const m of memberMarkersRef.current.values()) m.remove();
       memberMarkersRef.current.clear();
+      for (const m of meetupMarkersRef.current.values()) m.remove();
+      meetupMarkersRef.current.clear();
       map?.remove();
       mapRef.current = null;
     };
@@ -391,7 +403,7 @@ export function FamilyGeoMap({
     const map = mapRef.current;
     if (!map) return;
     const canvas = map.getCanvas();
-    if (interactive && drawMode !== 'none') {
+    if (drawMode !== 'none') {
       canvas.style.cursor = 'crosshair';
     } else if (interactive && compounds.length > 0) {
       canvas.style.cursor = 'pointer';
@@ -448,6 +460,39 @@ export function FamilyGeoMap({
     }
   }, [sharedPins]);
 
+  // Meetup pins (shared rendezvous labels)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const wanted = new Map(meetingPoints.map((p) => [p.id, p]));
+    const existing = meetupMarkersRef.current;
+
+    for (const [id, marker] of existing) {
+      if (!wanted.has(id)) {
+        marker.remove();
+        existing.delete(id);
+      }
+    }
+
+    for (const point of meetingPoints) {
+      const prev = existing.get(point.id);
+      if (prev) {
+        prev.setLngLat([point.position.lng, point.position.lat]);
+        const labelEl = prev.getElement().querySelector('.oki-map-name-label');
+        if (labelEl) labelEl.textContent = point.name;
+        continue;
+      }
+      const marker = new maplibregl.Marker({
+        element: createNamedMarkerEl(point.name, 'meetup'),
+        anchor: 'bottom',
+      })
+        .setLngLat([point.position.lng, point.position.lat])
+        .addTo(map);
+      existing.set(point.id, marker);
+    }
+  }, [meetingPoints]);
+
   // Follow self GPS when present
   useEffect(() => {
     const map = mapRef.current;
@@ -461,7 +506,8 @@ export function FamilyGeoMap({
     });
   }, [self, center]);
 
-  const emptyGps = !self && !center && sharedPins.length === 0;
+  const emptyGps =
+    !self && !center && sharedPins.length === 0 && meetingPoints.length === 0;
 
   return (
     <div
@@ -484,6 +530,11 @@ export function FamilyGeoMap({
       {drawMode === 'compound' ? (
         <p className="oki-geo-map-banner oki-geo-map-banner--draw" role="status">
           {t('family.mapTapCompound')}
+        </p>
+      ) : null}
+      {drawMode === 'meetup' ? (
+        <p className="oki-geo-map-banner oki-geo-map-banner--draw" role="status">
+          {t('family.mapTapMeetup')}
         </p>
       ) : null}
       {interactive && drawMode === 'none' && compounds.length > 0 ? (

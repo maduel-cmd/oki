@@ -63,6 +63,12 @@ export type CloudFamilySnapshot = {
     ring: LatLng[];
     createdBy: string;
   }>;
+  meetingPoints: Array<{
+    id: string;
+    name: string;
+    position: LatLng;
+    createdBy: string;
+  }>;
   locationRequests: Array<{
     id: string;
     fromAdminId: string;
@@ -268,6 +274,7 @@ export async function fetchCloudFamilySnapshot(
     zonesRes,
     linesRes,
     compoundsRes,
+    meetingsRes,
     reqRes,
     alertsRes,
   ] = await Promise.all([
@@ -276,6 +283,7 @@ export async function fetchCloudFamilySnapshot(
     client.from('family_zones').select('*').eq('family_id', familyId),
     client.from('family_boundary_lines').select('*').eq('family_id', familyId),
     client.from('family_compounds').select('*').eq('family_id', familyId),
+    client.from('family_meeting_points').select('*').eq('family_id', familyId),
     client
       .from('family_location_requests')
       .select('*')
@@ -292,7 +300,7 @@ export async function fetchCloudFamilySnapshot(
   if (familyRes.error) throw familyRes.error;
   if (membersRes.error) throw membersRes.error;
   if (zonesRes.error) throw zonesRes.error;
-  // Lines / compounds may 404 before migration — treat as empty for non-admins / missing table
+  // Lines / compounds / meetings may 404 before migration — treat as empty
   if (linesRes.error && !/does not exist|permission|42501|PGRST/i.test(linesRes.error.message)) {
     throw linesRes.error;
   }
@@ -301,6 +309,12 @@ export async function fetchCloudFamilySnapshot(
     !/does not exist|permission|42501|PGRST|42P01/i.test(compoundsRes.error.message)
   ) {
     throw compoundsRes.error;
+  }
+  if (
+    meetingsRes.error &&
+    !/does not exist|permission|42501|PGRST|42P01/i.test(meetingsRes.error.message)
+  ) {
+    throw meetingsRes.error;
   }
   if (reqRes.error) throw reqRes.error;
   if (alertsRes.error) throw alertsRes.error;
@@ -351,6 +365,20 @@ export async function fetchCloudFamilySnapshot(
     })
     .filter((c): c is NonNullable<typeof c> => c != null);
 
+  const meetingPoints = ((meetingsRes.data ?? []) as unknown[])
+    .map((m) => {
+      const row = m as Record<string, unknown>;
+      const position = parseGeoPoint(row.geom);
+      if (!position) return null;
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        position,
+        createdBy: row.created_by as string,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m != null);
+
   const locationRequests = (reqRes.data ?? []).map((r) => ({
     id: r.id as string,
     fromAdminId: r.from_admin_id as string,
@@ -374,6 +402,7 @@ export async function fetchCloudFamilySnapshot(
     zones,
     lines,
     compounds,
+    meetingPoints,
     locationRequests,
     alerts,
   };
@@ -519,6 +548,40 @@ export async function removeCloudCompound(
     .from('family_compounds')
     .delete()
     .eq('id', compoundId);
+  if (error) throw error;
+}
+
+export async function addCloudMeetingPoint(
+  client: OkiClient,
+  input: {
+    familyId: string;
+    createdBy: string;
+    name: string;
+    position: LatLng;
+  },
+): Promise<string> {
+  const { data, error } = await client
+    .from('family_meeting_points')
+    .insert({
+      family_id: input.familyId,
+      name: input.name,
+      geom: pointWkt(input.position),
+      created_by: input.createdBy,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function removeCloudMeetingPoint(
+  client: OkiClient,
+  meetingPointId: string,
+): Promise<void> {
+  const { error } = await client
+    .from('family_meeting_points')
+    .delete()
+    .eq('id', meetingPointId);
   if (error) throw error;
 }
 

@@ -28,6 +28,7 @@ import {
   type FamilyBoundaryLine,
   type FamilyCompound,
   type FamilyLocationRequest,
+  type FamilyMeetingPoint,
   type FamilyPermissionKind,
   type FamilyPermissionStatus,
   type FamilyRole,
@@ -37,6 +38,7 @@ import {
 import {
   addCloudBoundaryLine,
   addCloudCompound,
+  addCloudMeetingPoint,
   addCloudZone,
   createCloudFamily,
   createCloudLocationRequest,
@@ -48,6 +50,7 @@ import {
   leaveCloudFamily,
   removeCloudBoundaryLine,
   removeCloudCompound,
+  removeCloudMeetingPoint,
   removeCloudZone,
   respondCloudLocationRequest,
   setCloudQuietPreferred,
@@ -89,6 +92,8 @@ export type FamilyGroupLocal = {
   lines: FamilyBoundaryLine[];
   /** Closed enclosures — parent-only visibility. */
   compounds: FamilyCompound[];
+  /** Manual meetup pins — visible to all members. */
+  meetingPoints: FamilyMeetingPoint[];
   locationRequests: FamilyLocationRequest[];
   alerts: FamilyAlert[];
 };
@@ -150,6 +155,8 @@ type FamilyContextValue = {
   removeBoundaryLine: (lineId: string) => Promise<void>;
   addCompound: (input: { name: string; ring: LatLng[] }) => Promise<void>;
   removeCompound: (compoundId: string) => Promise<void>;
+  addMeetingPoint: (input: { name: string; position: LatLng }) => Promise<void>;
+  removeMeetingPoint: (meetingPointId: string) => Promise<void>;
   requestMemberLocation: (memberId: string) => Promise<void>;
   respondLocationRequest: (requestId: string, accept: boolean) => Promise<void>;
   renameSelf: (displayName: string) => Promise<void>;
@@ -220,6 +227,12 @@ function snapshotToLocal(
       ring: c.ring,
       createdBy: c.createdBy,
     })),
+    meetingPoints: (snap.meetingPoints ?? []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      position: m.position,
+      createdBy: m.createdBy,
+    })),
     locationRequests: snap.locationRequests.map((r) => ({
       id: r.id,
       fromAdminId: r.fromAdminId,
@@ -262,6 +275,7 @@ function loadStored(selfFallbackId: string): StoredState {
               sharedPosition: m.sharedPosition ?? null,
             })),
             compounds: parsed.family.compounds ?? [],
+            meetingPoints: parsed.family.meetingPoints ?? [],
           }
         : null,
       selfId: parsed.selfId || selfFallbackId,
@@ -824,6 +838,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         zones: [],
         lines: [],
         compounds: [],
+        meetingPoints: [],
         locationRequests: [],
         alerts: [],
       });
@@ -899,6 +914,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           zones: [],
           lines: [],
           compounds: [],
+          meetingPoints: [],
           locationRequests: [],
           alerts: [],
         };
@@ -1213,6 +1229,88 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     [client],
   );
 
+  const addMeetingPoint = useCallback(
+    async (input: { name: string; position: LatLng }) => {
+      const current = familyRef.current;
+      const name = input.name.trim() || 'מפגש';
+      const createdBy = session?.user?.id ?? selfIdRef.current;
+      let id = uid('mtp');
+      if (client && session?.user?.id && current && isUuid(current.id)) {
+        try {
+          id = await addCloudMeetingPoint(client, {
+            familyId: current.id,
+            createdBy: session.user.id,
+            name,
+            position: input.position,
+          });
+        } catch (err) {
+          console.warn('[Oki] cloud addMeetingPoint failed', err);
+        }
+      }
+      const point: FamilyMeetingPoint = {
+        id,
+        name,
+        position: input.position,
+        createdBy,
+      };
+      const alert: FamilyAlert = {
+        id: uid('al'),
+        kind: 'meeting_point',
+        memberId: createdBy,
+        label: name,
+        at: new Date().toISOString(),
+        position: input.position,
+      };
+      setFamily((prev) =>
+        prev
+          ? {
+              ...prev,
+              meetingPoints: [...(prev.meetingPoints ?? []), point],
+              alerts: [alert, ...prev.alerts].slice(0, 50),
+            }
+          : prev,
+      );
+      if (client && current && isUuid(current.id)) {
+        try {
+          await insertCloudFamilyAlert(client, {
+            familyId: current.id,
+            memberId: createdBy,
+            kind: 'meeting_point',
+            label: name,
+            position: input.position,
+          });
+        } catch (err) {
+          console.warn('[Oki] cloud meeting_point alert failed', err);
+        }
+      }
+    },
+    [client, session?.user?.id],
+  );
+
+  const removeMeetingPoint = useCallback(
+    async (meetingPointId: string) => {
+      const current = familyRef.current;
+      if (client && current && isUuid(current.id)) {
+        try {
+          await removeCloudMeetingPoint(client, meetingPointId);
+        } catch (err) {
+          console.warn('[Oki] cloud removeMeetingPoint failed', err);
+        }
+      }
+      setFamily((prev) =>
+        prev
+          ? {
+              ...prev,
+              meetingPoints: (prev.meetingPoints ?? []).filter(
+                (m) => m.id !== meetingPointId,
+              ),
+            }
+          : prev,
+      );
+    },
+    [client],
+  );
+
   const requestMemberLocation = useCallback(
     async (memberId: string) => {
       const current = familyRef.current;
@@ -1376,6 +1474,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       removeBoundaryLine,
       addCompound,
       removeCompound,
+      addMeetingPoint,
+      removeMeetingPoint,
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,
@@ -1410,6 +1510,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       removeBoundaryLine,
       addCompound,
       removeCompound,
+      addMeetingPoint,
+      removeMeetingPoint,
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,

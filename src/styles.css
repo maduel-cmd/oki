@@ -1115,6 +1115,19 @@ h2,
   border-color: rgba(13, 63, 60, 0.22);
 }
 
+.oki-map-name-marker--meetup .oki-map-name-dot {
+  background: #c9850f;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.oki-map-name-marker--meetup .oki-map-name-label {
+  color: #6b4a08;
+  border-color: rgba(201, 133, 15, 0.35);
+}
+
 .oki-map-actions {
   display: flex;
   flex-wrap: wrap;

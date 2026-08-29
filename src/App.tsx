@@ -736,11 +736,13 @@ function ZonesTab() {
   const [zoneName, setZoneName] = useState('');
   const [zoneRadius, setZoneRadius] = useState(String(DEFAULT_ZONE_RADIUS_M));
   const [compoundName, setCompoundName] = useState('');
+  const [meetupName, setMeetupName] = useState('');
   const [forceAudio, setForceAudio] = useState(true);
   const [drawMode, setDrawMode] = useState<FamilyMapDrawMode>('none');
   const [draftRing, setDraftRing] = useState<LatLng[]>([]);
 
   const adminCompounds = fw.isAdmin ? (fw.family?.compounds ?? []) : [];
+  const meetingPoints = fw.family?.meetingPoints ?? [];
 
   const mapPins = (() => {
     const pins: {
@@ -779,6 +781,15 @@ function ZonesTab() {
     .map((m) => m.displayName);
 
   const onMapPick = (pos: LatLng) => {
+    if (drawMode === 'meetup') {
+      void fw.addMeetingPoint({
+        name: meetupName,
+        position: pos,
+      });
+      setMeetupName('');
+      setDrawMode('none');
+      return;
+    }
     if (!fw.isAdmin) return;
     if (drawMode === 'zone') {
       void fw.addZone({
@@ -812,6 +823,9 @@ function ZonesTab() {
     setDrawMode('none');
   };
 
+  const canRemoveMeetup = (createdBy: string) =>
+    fw.isAdmin || createdBy === fw.self?.id;
+
   return (
     <div className="oki-tab-panel oki-stack">
       <div className="oki-section">
@@ -822,6 +836,7 @@ function ZonesTab() {
           self={fw.position}
           zones={fw.family?.zones ?? []}
           compounds={adminCompounds}
+          meetingPoints={meetingPoints}
           draftRing={drawMode === 'compound' ? draftRing : []}
           interactive={fw.isAdmin}
           drawMode={drawMode}
@@ -839,6 +854,74 @@ function ZonesTab() {
           <p className="oki-zone-banner">
             {t('family.inZoneBanner', { zone: fw.forceAudioZoneName })}
           </p>
+        ) : null}
+      </div>
+
+      <div className="oki-section oki-stack">
+        <h2>{t('family.meetupsTitleHuman')}</h2>
+        <p className="oki-muted">{t('family.meetupsHintHuman')}</p>
+        <label className="oki-field">
+          <span>{t('family.meetupName')}</span>
+          <input
+            value={meetupName}
+            onChange={(e) => setMeetupName(e.target.value)}
+            placeholder={t('family.meetupNamePlaceholder')}
+          />
+        </label>
+        <div className="oki-map-actions">
+          <button
+            type="button"
+            className={`oki-btn${drawMode === 'meetup' ? ' oki-btn--active' : ''}`}
+            onClick={() => {
+              setDraftRing([]);
+              setDrawMode((m) => (m === 'meetup' ? 'none' : 'meetup'));
+            }}
+          >
+            {drawMode === 'meetup'
+              ? t('family.mapCancelDraw')
+              : t('family.mapMarkMeetup')}
+          </button>
+          <button
+            type="button"
+            className="oki-btn oki-btn--ghost"
+            disabled={!fw.position}
+            onClick={() => {
+              if (!fw.position) return;
+              void fw.addMeetingPoint({
+                name: meetupName,
+                position: fw.position,
+              });
+              setMeetupName('');
+              setDrawMode('none');
+            }}
+          >
+            {t('family.addMeetupHere')}
+          </button>
+        </div>
+        <ul className="oki-zone-list">
+          {meetingPoints.map((m) => (
+            <li key={m.id}>
+              <div>
+                <strong>{m.name}</strong>
+              </div>
+              {canRemoveMeetup(m.createdBy) ? (
+                <button
+                  type="button"
+                  className="oki-btn oki-btn--danger"
+                  onClick={() => {
+                    if (window.confirm(t('family.confirmRemoveMeetup'))) {
+                      void fw.removeMeetingPoint(m.id);
+                    }
+                  }}
+                >
+                  {t('family.remove')}
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {meetingPoints.length === 0 ? (
+          <p className="oki-muted">{t('family.meetupsEmpty')}</p>
         ) : null}
       </div>
 
