@@ -38,6 +38,9 @@ Aliases: @oki/domain @oki/api @oki/i18n @oki/live @oki/maps
 
 ### א׳. ריפו GitHub נפרד
 
+**סטטוס בעלים (2026-08-29):** בינתיים **תיקייה מקומית בלבד** — בלי דחיפה ל־GitHub.  
+כשתרצו סוכן Cloud עצמאי, צרו ריפו ואז:
+
 1. צרו ריפו חדש ב־GitHub (למשל `maduel-cmd/oki-family`), **ריק**.
 2. מהתיקייה הזו:
 

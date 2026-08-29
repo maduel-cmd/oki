@@ -16,8 +16,9 @@ npm run dev                  # http://127.0.0.1:5174
 
 ## פריסה
 
-- Netlify: `netlify.toml` בשורש (`npm run build` → `dist`)
-- Supabase: הריצו את המיגרציות ב־`supabase/migrations/` (profiles → family → compounds)
+- Netlify אתר: `oki-family-maduel` — מפריסים מ־`oki-family/dist` (`npm run deploy:netlify`)
+- בעלים נעל: תיקייה מקומית בינתיים (בלי GitHub); אותו Supabase כמו TrailLink — ראו `docs/OWNER_DECISIONS_he.md`
+- Supabase: מיגרציות ב־`supabase/migrations/` (אם חסר בפרויקט הקיים)
 - LiveKit: secrets ב־Edge Function `family-livekit-token`
 
 ## סוכנים
