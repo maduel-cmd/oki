@@ -36,5 +36,7 @@ cd oki-family && npm run deploy:netlify
 
 ## Netlify — Git vs CLI
 
-- פריסה פעילה: `npm run deploy:netlify` (CLI)
-- חיבור Git ל־branch `oki-family` הוגדר, אבל clone נכשל בלי אישור Netlify GitHub App לריפו הפרטי — `stop_builds=true` עד שתחברו ב־Netlify UI (Site settings → Build & deploy → Link repository / Authorize).
+- פריסה פעילה ואמינה: `npm run deploy:netlify` (CLI) — **חובה על סוכן אחרי push**
+- חיבור Git ל־branch `oki-family` הוגדר + נוצר deploy key ב־Netlify
+- הוספת המפתח ל־GitHub דורשת `administration=write` — טוקן הסוכן **נדחה (403)**; Continuous Deploy מ־Git לא פעיל (`stop_builds=true`)
+- מפתח ציבורי שמור ב־`docs/NETLIFY_DEPLOY_KEY.pub` לשימוש עתידי אם תהיה הרשאה

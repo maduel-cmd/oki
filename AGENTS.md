@@ -46,9 +46,12 @@ npm run dev          # http://127.0.0.1:5174
 npm run build
 npm run typecheck
 npm run test
+npm run deploy:netlify   # חובה אחרי push שמשנה UI/בילד
 ```
 
 Env: העתיקו `.env.example` → `.env.local` עם `VITE_SUPABASE_*`.
+
+**פריסה:** Netlify Continuous Deploy מ־Git חסום לטוקן הסוכן (אין `administration` להוספת deploy key). לכן אחרי כל שינוי שדורש פרוד — הריצו `npm run deploy:netlify` בעצמכם (אל תבקשו מהמשתמש).
 
 ---
 
@@ -57,3 +60,4 @@ Env: העתיקו `.env.example` → `.env.local` עם `VITE_SUPABASE_*`.
 - לא לערבב קוד TrailLink / ניווט שטח / trips / SOS.
 - לא להחזיר סימון קו עיפרון במקום מתחם סגור.
 - לא לשתף מיקום רציף בלי בקשה+אישור.
+- לא לבקש מהמשתמש פעולה לפני שניסיתם לפתור לבד (ראו `.cursor/rules/solve-first.mdc`).
