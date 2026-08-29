@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@oki/domain": ["src/lib/domain"],
+      "@oki/domain/*": ["src/lib/domain/*"],
+      "@oki/api": ["src/lib/api"],
+      "@oki/api/*": ["src/lib/api/*"],
+      "@oki/i18n": ["src/lib/i18n"],
+      "@oki/i18n/*": ["src/lib/i18n/*"],
+      "@oki/live": ["src/lib/live"],
+      "@oki/live/*": ["src/lib/live/*"],
+      "@oki/maps": ["src/lib/maps"],
+      "@oki/maps/*": ["src/lib/maps/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

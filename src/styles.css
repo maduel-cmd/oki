@@ -1,0 +1,1187 @@
+:root {
+  --oki-ink: #142828;
+  --oki-muted: #4d6464;
+  --oki-teal: #0d3f3c;
+  --oki-teal-mid: #1a5854;
+  --oki-amber: #d99214;
+  --oki-surface: #fffdf9;
+  --oki-wash: #eef2ef;
+  --oki-danger: #a33b2d;
+  --oki-ok: #1b6b45;
+  --oki-signal: #c45c26;
+  --oki-font-display: 'Rubik', 'Noto Sans Arabic', system-ui, sans-serif;
+  --oki-font-body: 'Heebo', 'Noto Sans Arabic', system-ui, sans-serif;
+  --oki-radius: 18px;
+  --oki-touch: 48px;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--oki-font-body);
+  color: var(--oki-ink);
+  background:
+    radial-gradient(720px 380px at 100% -8%, rgba(217, 146, 20, 0.14), transparent 55%),
+    radial-gradient(640px 360px at -8% 5%, rgba(26, 88, 84, 0.14), transparent 52%),
+    linear-gradient(180deg, #f6f8f6 0%, var(--oki-wash) 100%);
+}
+
+h1,
+h2,
+.oki-brand,
+.oki-brand-mini {
+  font-family: var(--oki-font-display);
+}
+
+.oki-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.oki-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(13, 63, 60, 0.1);
+  background: rgba(255, 253, 249, 0.86);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.oki-brand-mini {
+  font-weight: 700;
+  color: var(--oki-teal);
+  letter-spacing: 0.02em;
+}
+
+.oki-topbar select {
+  border: 1px solid rgba(13, 63, 60, 0.2);
+  border-radius: 12px;
+  padding: 0.4rem 0.75rem;
+  min-height: 40px;
+  background: #fff;
+  font: inherit;
+}
+
+.oki-main {
+  width: min(72rem, 100%);
+  margin-inline: auto;
+  padding: 0.75rem 1rem 5.5rem;
+  flex: 1;
+}
+
+.oki-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.oki-gate {
+  display: grid;
+  gap: 1rem;
+  max-width: 28rem;
+  margin-inline: auto;
+}
+
+.oki-gate-hero {
+  padding: 1rem 0 0.25rem;
+  animation: oki-rise 0.45s ease-out both;
+}
+
+.oki-brand {
+  margin: 0;
+  color: var(--oki-teal-mid);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.oki-gate-hero h1,
+.oki-active-header h1 {
+  margin: 0.15rem 0 0.35rem;
+  font-size: clamp(1.7rem, 5vw, 2.2rem);
+  line-height: 1.15;
+  color: var(--oki-teal);
+}
+
+.oki-lead {
+  margin: 0;
+  color: var(--oki-muted);
+  font-size: 1.05rem;
+  max-width: 34ch;
+}
+
+.oki-section,
+.oki-sheet {
+  background: var(--oki-surface);
+  border: 1px solid rgba(13, 63, 60, 0.1);
+  border-radius: var(--oki-radius);
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(20, 40, 40, 0.04);
+}
+
+.oki-section h2,
+.oki-sheet h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  color: var(--oki-teal);
+}
+
+.oki-muted {
+  color: var(--oki-muted);
+  margin: 0;
+}
+
+.oki-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.oki-error {
+  color: var(--oki-danger);
+  margin: 0;
+}
+
+.oki-btn {
+  appearance: none;
+  border: none;
+  border-radius: 14px;
+  background: var(--oki-teal);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.75rem 1.1rem;
+  min-height: var(--oki-touch);
+  cursor: pointer;
+}
+
+.oki-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.oki-btn--ghost {
+  background: transparent;
+  color: var(--oki-teal);
+  border: 1px solid rgba(13, 63, 60, 0.28);
+}
+
+.oki-btn--danger {
+  background: var(--oki-danger);
+}
+
+.oki-btn--large {
+  width: 100%;
+  font-size: 1.05rem;
+}
+
+.oki-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.oki-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.oki-field > span {
+  font-size: 0.9rem;
+  color: var(--oki-muted);
+}
+
+.oki-field input,
+.oki-invite-input {
+  width: 100%;
+  border: 1px solid rgba(13, 63, 60, 0.2);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  background: #fff;
+  min-height: var(--oki-touch);
+}
+
+.oki-invite-input {
+  letter-spacing: 0.28em;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.oki-choice {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.oki-linkish {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--oki-teal-mid);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  padding: 0;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.oki-perm-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.oki-perm-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 14px;
+  border: 1px solid rgba(13, 63, 60, 0.12);
+  background: #fff;
+}
+
+.oki-perm-card p {
+  margin: 0.2rem 0;
+  color: var(--oki-muted);
+  font-size: 0.92rem;
+}
+
+.oki-perm-status {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.oki-perm-card--granted .oki-perm-status {
+  color: var(--oki-ok);
+}
+
+.oki-perm-card--denied .oki-perm-status,
+.oki-perm-card--prompt .oki-perm-status,
+.oki-perm-card--unknown .oki-perm-status {
+  color: var(--oki-signal);
+}
+
+.oki-account-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--oki-teal);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.oki-account-details[open] summary {
+  margin-bottom: 0.65rem;
+}
+
+.oki-active {
+  display: grid;
+  gap: 0.75rem;
+  min-height: calc(100dvh - 5rem);
+}
+
+.oki-active-header h1 {
+  margin-bottom: 0.1rem;
+}
+
+.oki-active-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.oki-desktop-side {
+  display: none;
+}
+
+.oki-radio {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 0.15rem 0 0.5rem;
+  min-height: min(72dvh, 40rem);
+  align-content: start;
+}
+
+.oki-walkie {
+  position: relative;
+  width: min(100%, 22rem);
+  padding-top: 1.85rem;
+  filter: drop-shadow(0 18px 28px rgba(20, 40, 40, 0.14));
+}
+
+.oki-walkie-antenna {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 16%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 3;
+}
+
+.oki-walkie-antenna-base {
+  width: 1.05rem;
+  height: 0.45rem;
+  border-radius: 0.2rem 0.2rem 0.1rem 0.1rem;
+  background: linear-gradient(180deg, #d8e0dd, #9aa6a2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  margin-bottom: -0.05rem;
+}
+
+.oki-walkie-antenna-stem {
+  width: 0.38rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #b8c2be 0 3px,
+      #8f9b97 3px 6px
+    );
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.35),
+    inset 1px 0 0 rgba(0, 0, 0, 0.12);
+}
+
+.oki-walkie-antenna-tip {
+  width: 0.78rem;
+  height: 0.78rem;
+  margin-top: -0.1rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, #f2f5f4, #7d8985 62%, #4e5855 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.oki-walkie-knob {
+  position: absolute;
+  top: 1.55rem;
+  inset-inline-start: 14%;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 210deg, #e8eeeb, #aeb8b4, #e8eeeb, #97a29e, #e8eeeb);
+  border: 2px solid rgba(13, 63, 60, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 4px rgba(0, 0, 0, 0.12);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+}
+
+.oki-walkie-knob span {
+  width: 0.22rem;
+  height: 0.45rem;
+  border-radius: 99px;
+  background: #5f6b68;
+  transform: translateY(-0.12rem);
+}
+
+.oki-walkie-body {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.05rem 1.2rem;
+  border-radius: 1.55rem 1.55rem 2.35rem 2.35rem / 1.7rem 1.7rem 2.6rem 2.6rem;
+  background:
+    linear-gradient(145deg, #ffffff 0%, #f7faf8 38%, #eef3f0 72%, #e4ebe7 100%);
+  border: 1px solid rgba(13, 63, 60, 0.16);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -10px 18px rgba(13, 63, 60, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.8);
+  color: var(--oki-ink);
+}
+
+.oki-walkie-body::before {
+  content: '';
+  position: absolute;
+  inset: 0.48rem;
+  border-radius: 1.2rem 1.2rem 1.95rem 1.95rem / 1.35rem 1.35rem 2.15rem 2.15rem;
+  border: 1px solid rgba(13, 63, 60, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.oki-walkie-body::after {
+  content: '';
+  position: absolute;
+  inset-inline: 18%;
+  bottom: 0.35rem;
+  height: 0.28rem;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, rgba(13, 63, 60, 0.12), transparent);
+  pointer-events: none;
+}
+
+.oki-walkie-screw {
+  position: absolute;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #f4f7f5, #9aa6a2 70%);
+  box-shadow:
+    inset 0 0 0 1px rgba(13, 63, 60, 0.18),
+    0 1px 1px rgba(0, 0, 0, 0.08);
+  z-index: 2;
+}
+
+.oki-walkie-screw::after {
+  content: '';
+  position: absolute;
+  inset: 35% 18%;
+  background: rgba(13, 63, 60, 0.35);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.oki-walkie-screw--tl { top: 0.72rem; inset-inline-start: 0.72rem; }
+.oki-walkie-screw--tr { top: 0.72rem; inset-inline-end: 0.72rem; }
+.oki-walkie-screw--bl { bottom: 0.85rem; inset-inline-start: 0.85rem; }
+.oki-walkie-screw--br { bottom: 0.85rem; inset-inline-end: 0.85rem; }
+
+.oki-walkie-side-btn {
+  position: absolute;
+  inset-inline-start: -0.48rem;
+  top: 34%;
+  display: grid;
+  gap: 0.4rem;
+  z-index: 2;
+}
+
+.oki-walkie-side-btn span {
+  width: 0.58rem;
+  height: 1.2rem;
+  border-radius: 0.35rem 0.1rem 0.1rem 0.35rem;
+  background: linear-gradient(90deg, #eef3f0, #c5d0cb);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.85),
+    1px 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(13, 63, 60, 0.14);
+  border-inline-end: none;
+}
+
+.oki-walkie-ptt-ridge {
+  height: 2.4rem !important;
+  background:
+    linear-gradient(90deg, #d9e2de, #aeb9b5 55%, #d5dedb) !important;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.7),
+    2px 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.oki-walkie-brand {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-inline: 0.55rem;
+  position: relative;
+  z-index: 1;
+}
+
+.oki-walkie-brand-mark {
+  font-family: var(--oki-font-display, Rubik, Heebo, sans-serif);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 0.95rem;
+  color: var(--oki-teal);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.oki-walkie-led {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #eef3f0, #c5cecb);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.16),
+    0 0 0 2px rgba(13, 63, 60, 0.08);
+}
+
+.oki-walkie-led.is-on {
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #ffb020 70%);
+  box-shadow:
+    0 0 0 3px rgba(255, 176, 32, 0.22),
+    0 0 14px rgba(255, 176, 32, 0.5);
+  animation: oki-led-blink 1.1s ease-in-out infinite;
+}
+
+.oki-walkie-lcd {
+  width: 100%;
+  min-height: 4.7rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(180deg, #dce8d4 0%, #c5d6b8 100%);
+  color: #1a2e18;
+  border: 2px solid rgba(13, 63, 60, 0.22);
+  box-shadow:
+    inset 0 2px 6px rgba(13, 63, 60, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.6);
+  text-align: start;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.oki-walkie-lcd-glass {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    transparent 42%,
+    transparent 58%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  pointer-events: none;
+}
+
+.oki-walkie-channel {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(26, 46, 24, 0.65);
+  position: relative;
+}
+
+.oki-walkie-lcd-status {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0b3d28;
+  position: relative;
+}
+
+.oki-walkie-lcd-who {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1a2e18;
+  position: relative;
+}
+
+.oki-walkie-lcd .oki-tx-timer {
+  margin-top: 0.15rem;
+  color: #7a3e00;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+}
+
+.oki-walkie-grille {
+  position: relative;
+  width: 100%;
+  padding: 0.55rem 0.45rem 0.45rem;
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(180deg, #f4f7f5 0%, #e4ebe7 100%);
+  border: 1px solid rgba(13, 63, 60, 0.14);
+  box-shadow: inset 0 2px 5px rgba(13, 63, 60, 0.08);
+  z-index: 1;
+  overflow: hidden;
+}
+
+.oki-walkie-mesh {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.28rem 0.32rem;
+  padding: 0.15rem 0.1rem 0.55rem;
+}
+
+.oki-walkie-mesh-hole {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #6b7874, #2a3331 70%);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.35),
+    0 0.5px 0 rgba(255, 255, 255, 0.45);
+  opacity: 0.55;
+}
+
+.oki-walkie-grille-bar {
+  display: none;
+}
+
+.oki-walkie-grille .oki-wave {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.4rem;
+  justify-content: center;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.oki-walkie-grille .oki-wave.is-live {
+  opacity: 1;
+}
+
+.oki-walkie .oki-quiet-bar,
+.oki-walkie .oki-presence-strip {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.oki-walkie .oki-quiet-toggle {
+  width: 100%;
+  background: linear-gradient(180deg, #ffffff, #f3f6f4);
+  color: var(--oki-ink);
+  border-color: rgba(13, 63, 60, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.oki-walkie .oki-quiet-toggle.is-on {
+  background: rgba(217, 146, 20, 0.12);
+  border-color: rgba(217, 146, 20, 0.4);
+  color: var(--oki-ink);
+}
+
+.oki-walkie .oki-quiet-explain,
+.oki-walkie .oki-muted {
+  color: var(--oki-muted);
+}
+
+.oki-walkie .oki-presence {
+  background: #fff;
+  color: var(--oki-ink);
+  border: 1px solid rgba(13, 63, 60, 0.1);
+}
+
+.oki-walkie .oki-presence.is-speaking {
+  background: rgba(217, 146, 20, 0.14);
+  border-color: rgba(217, 146, 20, 0.35);
+}
+
+.oki-walkie.is-tx .oki-walkie-body {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -10px 18px rgba(13, 63, 60, 0.05),
+    0 0 0 3px rgba(217, 146, 20, 0.18);
+}
+
+.oki-walkie.is-rx .oki-walkie-led.is-on {
+  animation-duration: 0.55s;
+}
+
+.oki-live-status {
+  display: none;
+}
+
+.oki-speaker {
+  display: none;
+}
+
+.oki-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #1f6a64, var(--oki-teal));
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.oki-avatar--sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.75rem;
+}
+
+.oki-wave {
+  display: flex;
+  gap: 0.22rem;
+  align-items: flex-end;
+  height: 1.1rem;
+}
+
+.oki-wave span {
+  width: 0.22rem;
+  border-radius: 99px;
+  background: var(--oki-amber);
+  animation: oki-wave 0.9s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.oki-wave.is-live span {
+  animation-play-state: running;
+}
+
+.oki-wave span:nth-child(1) {
+  height: 35%;
+  animation-delay: 0s;
+}
+.oki-wave span:nth-child(2) {
+  height: 70%;
+  animation-delay: 0.1s;
+}
+.oki-wave span:nth-child(3) {
+  height: 100%;
+  animation-delay: 0.2s;
+}
+.oki-wave span:nth-child(4) {
+  height: 55%;
+  animation-delay: 0.15s;
+}
+.oki-wave span:nth-child(5) {
+  height: 40%;
+  animation-delay: 0.05s;
+}
+
+.oki-ptt {
+  position: relative;
+  width: min(100%, 12.75rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 4px solid rgba(13, 63, 60, 0.2);
+  background:
+    radial-gradient(circle at 32% 26%, #2a7a72 0%, var(--oki-teal) 48%, #062624 100%);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -14px 22px rgba(0, 0, 0, 0.28),
+    0 12px 24px rgba(13, 63, 60, 0.22),
+    0 0 0 6px rgba(13, 63, 60, 0.06);
+  transition:
+    transform 90ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+  z-index: 1;
+}
+
+.oki-ptt-bevel {
+  position: absolute;
+  inset: 0.28rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.oki-ptt-ring {
+  position: absolute;
+  inset: 0.95rem;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.oki-ptt-core {
+  position: absolute;
+  inset: 27%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 32%, #4aa399, #0a3330 68%);
+  box-shadow:
+    inset 0 3px 5px rgba(255, 255, 255, 0.14),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.oki-ptt-label {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-size: clamp(0.98rem, 3.5vw, 1.18rem);
+  max-width: 10ch;
+  line-height: 1.2;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.oki-ptt.is-active {
+  transform: translateY(4px) scale(0.98);
+  filter: saturate(1.05);
+  box-shadow:
+    inset 0 10px 18px rgba(0, 0, 0, 0.28),
+    0 0 0 4px rgba(217, 146, 20, 0.22);
+}
+
+.oki-ptt.is-busy,
+.oki-ptt.is-blocked {
+  background: radial-gradient(circle at 35% 28%, #9aa6a4, #6b7876 70%);
+  border-color: rgba(13, 63, 60, 0.12);
+  box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.16);
+  cursor: not-allowed;
+}
+
+.oki-ptt:disabled {
+  opacity: 1;
+}
+
+.oki-quiet-bar {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  width: min(100%, 22rem);
+}
+
+@keyframes oki-led-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.oki-quiet-toggle {
+  appearance: none;
+  border: 1px solid rgba(13, 63, 60, 0.2);
+  background: #fff;
+  color: var(--oki-teal);
+  border-radius: 999px;
+  min-height: var(--oki-touch);
+  padding: 0.55rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oki-quiet-toggle.is-on {
+  background: rgba(13, 63, 60, 0.08);
+}
+
+.oki-quiet-toggle.is-blocked {
+  border-color: rgba(217, 146, 20, 0.45);
+  color: #8a5a00;
+  background: rgba(217, 146, 20, 0.1);
+}
+
+.oki-quiet-explain {
+  text-align: center;
+  font-size: 0.92rem;
+}
+
+.oki-quiet-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.oki-presence-strip {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  width: min(100%, 26rem);
+  padding: 0.25rem 0.15rem;
+  scrollbar-width: thin;
+}
+
+.oki-presence {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  min-width: 4.2rem;
+  font-size: 0.82rem;
+  color: var(--oki-muted);
+}
+
+.oki-presence.is-speaking {
+  color: var(--oki-teal);
+  font-weight: 700;
+}
+
+.oki-presence.is-speaking .oki-avatar {
+  box-shadow: 0 0 0 3px rgba(217, 146, 20, 0.45);
+}
+
+.oki-invite-code {
+  margin: 0.35rem 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--oki-teal);
+  font-variant-numeric: tabular-nums;
+}
+
+.oki-member-list,
+.oki-zone-list,
+.oki-alert-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.oki-member-list li,
+.oki-zone-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding-block: 0.35rem;
+  border-bottom: 1px solid rgba(13, 63, 60, 0.08);
+}
+
+.oki-member-main {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.oki-alert {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(13, 63, 60, 0.04);
+}
+
+.oki-alert--boundary_crossed {
+  background: rgba(196, 92, 38, 0.1);
+}
+
+.oki-sheet {
+  border-color: rgba(217, 146, 20, 0.4);
+  background: rgba(255, 248, 232, 0.95);
+}
+
+.oki-zone-banner {
+  margin: 0.65rem 0 0;
+  font-weight: 700;
+  color: var(--oki-teal);
+}
+
+.oki-bottom-nav {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  padding: 0.45rem 0.75rem calc(0.45rem + env(safe-area-inset-bottom));
+  background: rgba(255, 253, 249, 0.94);
+  border-top: 1px solid rgba(13, 63, 60, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.oki-bottom-nav button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--oki-muted);
+  font: inherit;
+  font-weight: 700;
+  min-height: var(--oki-touch);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.oki-bottom-nav button.is-active {
+  color: var(--oki-teal);
+  background: rgba(13, 63, 60, 0.08);
+}
+
+.oki-geo-map {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #dce8e6;
+  border: 1px solid rgba(13, 63, 60, 0.12);
+}
+
+.oki-geo-map--drawing {
+  box-shadow: 0 0 0 2px rgba(232, 163, 23, 0.55);
+}
+
+.oki-geo-map-canvas {
+  width: 100%;
+  height: min(52vh, 360px);
+  min-height: 220px;
+}
+
+.oki-geo-map--empty {
+  min-height: 8rem;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.oki-geo-caption {
+  margin: 0.45rem 0.65rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.oki-geo-map-banner {
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(13, 63, 60, 0.08);
+}
+
+.oki-geo-map-banner--draw {
+  color: #7a4e00;
+  background: rgba(232, 163, 23, 0.18);
+  font-weight: 600;
+}
+
+.oki-map-self-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  pointer-events: none;
+}
+
+.oki-map-self-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0b3d3d;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.oki-map-self-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0b3d3d;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.oki-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.oki-btn--active {
+  background: #0b3d3d;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.oki-geo-map .maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+
+@keyframes oki-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes oki-wave {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oki-wave span,
+  .oki-gate-hero,
+  .oki-ptt,
+  .oki-walkie-led.is-on {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (min-width: 900px) {
+  .oki-main {
+    padding-bottom: 2rem;
+  }
+
+  .oki-bottom-nav {
+    position: static;
+    border: 1px solid rgba(13, 63, 60, 0.12);
+    border-radius: 14px;
+    padding: 0.35rem;
+    background: var(--oki-surface);
+    max-width: 28rem;
+  }
+
+  .oki-active-body--radio {
+    grid-template-columns: 1fr;
+    max-width: 36rem;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .oki-active-body--family,
+  .oki-active-body--zones {
+    grid-template-columns: 1fr;
+    max-width: 40rem;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .oki-active-body--family .oki-radio-col,
+  .oki-active-body--zones .oki-radio-col {
+    display: none;
+  }
+
+  .oki-radio {
+    min-height: auto;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .oki-ptt {
+    width: 13.5rem;
+  }
+}
