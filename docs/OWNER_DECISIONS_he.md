@@ -8,6 +8,7 @@
 
 ## GitHub — איך זה נראה בפועל
 
+- **סטטוס סוכן:** ענף **`oki-family` פעיל** — סוכני Cloud עובדים ישירות על הענף הזה (שורש = אוקי משפחה בלבד).
 - ענף: https://github.com/maduel-cmd/TrailLink/tree/oki-family  
 - בשורש הענף: `package.json`, `src/`, `AGENTS.md` (לא מונוריפו TrailLink)
 - דחיפה מקומית:
