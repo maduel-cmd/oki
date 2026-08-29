@@ -182,6 +182,8 @@
     "saveName": "שמירת שם",
     "walkieChannel": "ערוץ · {{name}}",
     "mapOsmHint": "מפת רקע OpenStreetMap (OpenFreeMap)",
+    "mapMembersOnMap": "{{count}} בני משפחה על המפה",
+    "mapConnectedNoLocation": "מחוברים בלי מיקום משותף: {{names}}",
     "mapMarkZone": "סמן אזור על המפה",
     "mapMarkLine": "סמן קו גבול על המפה",
     "mapCancelDraw": "ביטול סימון",

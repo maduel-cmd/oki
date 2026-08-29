@@ -742,6 +742,42 @@ function ZonesTab() {
 
   const adminCompounds = fw.isAdmin ? (fw.family?.compounds ?? []) : [];
 
+  const mapPins = (() => {
+    const pins: {
+      id: string;
+      label: string;
+      position: LatLng;
+      isSelf?: boolean;
+    }[] = [];
+    if (fw.position && fw.self) {
+      pins.push({
+        id: fw.self.id,
+        label: fw.self.displayName || t('family.mapYou'),
+        position: fw.position,
+        isSelf: true,
+      });
+    }
+    if (fw.isAdmin) {
+      for (const m of fw.family?.members ?? []) {
+        if (m.id === fw.self?.id || !m.sharedPosition) continue;
+        pins.push({
+          id: m.id,
+          label: m.displayName,
+          position: m.sharedPosition,
+        });
+      }
+    }
+    return pins;
+  })();
+
+  const connectedWithoutLocation = (fw.family?.members ?? [])
+    .filter((m) => {
+      if (m.id === fw.self?.id) return !fw.position;
+      if (!fw.isAdmin) return true; // members don't see others' coords
+      return !m.sharedPosition;
+    })
+    .map((m) => m.displayName);
+
   const onMapPick = (pos: LatLng) => {
     if (!fw.isAdmin) return;
     if (drawMode === 'zone') {
@@ -796,17 +832,8 @@ function ZonesTab() {
               void fw.removeCompound(id);
             }
           }}
-          sharedPins={
-            fw.isAdmin
-              ? (fw.family?.members ?? [])
-                  .filter((m) => m.id !== fw.self?.id && m.sharedPosition)
-                  .map((m) => ({
-                    id: m.id,
-                    label: m.displayName,
-                    position: m.sharedPosition!,
-                  }))
-              : []
-          }
+          sharedPins={mapPins}
+          connectedWithoutLocation={connectedWithoutLocation}
         />
         {fw.forceAudioZoneName ? (
           <p className="oki-zone-banner">

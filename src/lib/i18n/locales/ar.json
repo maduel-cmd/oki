@@ -182,6 +182,8 @@
     "saveName": "حفظ الاسم",
     "walkieChannel": "قناة · {{name}}",
     "mapOsmHint": "خلفية OpenStreetMap (OpenFreeMap)",
+    "mapMembersOnMap": "{{count}} أفراد العائلة على الخريطة",
+    "mapConnectedNoLocation": "متصلون دون موقع مشترك: {{names}}",
     "mapMarkZone": "تعليم منطقة على الخريطة",
     "mapMarkLine": "تعليم خط حدود على الخريطة",
     "mapCancelDraw": "إلغاء التعليم",

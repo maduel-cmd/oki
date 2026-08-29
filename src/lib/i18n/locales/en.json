@@ -182,6 +182,8 @@
     "saveName": "Save name",
     "walkieChannel": "CH · {{name}}",
     "mapOsmHint": "Basemap OpenStreetMap (OpenFreeMap)",
+    "mapMembersOnMap": "{{count}} family members on the map",
+    "mapConnectedNoLocation": "Connected without shared location: {{names}}",
     "mapMarkZone": "Mark zone on map",
     "mapMarkLine": "Mark boundary line on map",
     "mapCancelDraw": "Cancel marking",

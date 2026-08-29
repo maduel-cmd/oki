@@ -32,13 +32,12 @@ const DRAFT_SOURCE = 'oki-draft';
 const DRAFT_FILL = 'oki-draft-fill';
 const DRAFT_LINE = 'oki-draft-line';
 const DRAFT_POINTS = 'oki-draft-points';
-const PINS_SOURCE = 'oki-pins';
-const PINS_LAYER = 'oki-pins-layer';
-
 export type SharedPin = {
   id: string;
   label: string;
   position: LatLng;
+  /** Highlight self differently from other family members. */
+  isSelf?: boolean;
 };
 
 export type FamilyMapDrawMode = 'none' | 'zone' | 'compound';
@@ -51,7 +50,10 @@ type Props = {
   compounds?: FamilyCompound[];
   /** Vertices while drawing a new compound (not yet closed). */
   draftRing?: LatLng[];
+  /** Family members with a known shared/self position — shown as named pins. */
   sharedPins?: SharedPin[];
+  /** Connected members without a map position (names only in caption). */
+  connectedWithoutLocation?: string[];
   /** Admin: allow tapping the map to place zones / compounds. */
   interactive?: boolean;
   drawMode?: FamilyMapDrawMode;
@@ -149,18 +151,25 @@ function draftToFeatureCollection(draft: LatLng[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
-function pinsToFeatureCollection(pins: SharedPin[]): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: pins.map((p) => ({
-      type: 'Feature',
-      properties: { id: p.id, label: p.label },
-      geometry: {
-        type: 'Point',
-        coordinates: [p.position.lng, p.position.lat],
-      },
-    })),
-  };
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function createNamedMarkerEl(
+  label: string,
+  kind: 'self' | 'member',
+): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className =
+    kind === 'self' ? 'oki-map-name-marker oki-map-name-marker--self' : 'oki-map-name-marker';
+  el.innerHTML =
+    `<span class="oki-map-name-dot" aria-hidden="true"></span>` +
+    `<span class="oki-map-name-label">${escapeHtml(label)}</span>`;
+  return el;
 }
 
 function ensureOverlayLayers(map: MapLibreMap): void {
@@ -278,25 +287,6 @@ function ensureOverlayLayers(map: MapLibreMap): void {
     });
   }
 
-  if (!map.getSource(PINS_SOURCE)) {
-    map.addSource(PINS_SOURCE, {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: [] },
-    });
-  }
-  if (!map.getLayer(PINS_LAYER)) {
-    map.addLayer({
-      id: PINS_LAYER,
-      type: 'circle',
-      source: PINS_SOURCE,
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#2a7a6a',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
-      },
-    });
-  }
 }
 
 function setSourceData(
@@ -308,13 +298,6 @@ function setSourceData(
   src?.setData(data);
 }
 
-function createSelfMarkerEl(label: string): HTMLDivElement {
-  const el = document.createElement('div');
-  el.className = 'oki-map-self-marker';
-  el.innerHTML = `<span class="oki-map-self-dot"></span><span class="oki-map-self-label">${label}</span>`;
-  return el;
-}
-
 export function FamilyGeoMap({
   center,
   self,
@@ -322,6 +305,7 @@ export function FamilyGeoMap({
   compounds = [],
   draftRing = [],
   sharedPins = [],
+  connectedWithoutLocation = [],
   interactive = false,
   drawMode = 'none',
   onMapPick,
@@ -330,7 +314,7 @@ export function FamilyGeoMap({
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const selfMarkerRef = useRef<Marker | null>(null);
+  const memberMarkersRef = useRef<Map<string, Marker>>(new Map());
   const onMapPickRef = useRef(onMapPick);
   const onCompoundClickRef = useRef(onCompoundClick);
   const drawModeRef = useRef(drawMode);
@@ -373,7 +357,6 @@ export function FamilyGeoMap({
         setSourceData(map, ZONES_SOURCE, zonesToFeatureCollection(zones));
         setSourceData(map, COMPOUNDS_SOURCE, compoundsToFeatureCollection(compounds));
         setSourceData(map, DRAFT_SOURCE, draftToFeatureCollection(draftRing));
-        setSourceData(map, PINS_SOURCE, pinsToFeatureCollection(sharedPins));
       });
 
       map.on('click', (e: MapMouseEvent) => {
@@ -395,8 +378,8 @@ export function FamilyGeoMap({
 
     return () => {
       cancelled = true;
-      selfMarkerRef.current?.remove();
-      selfMarkerRef.current = null;
+      for (const m of memberMarkersRef.current.values()) m.remove();
+      memberMarkersRef.current.clear();
       map?.remove();
       mapRef.current = null;
     };
@@ -417,7 +400,7 @@ export function FamilyGeoMap({
     }
   }, [interactive, drawMode, compounds.length]);
 
-  // Sync overlays
+  // Sync overlays (zones / compounds / draft)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -426,43 +409,59 @@ export function FamilyGeoMap({
       setSourceData(map, ZONES_SOURCE, zonesToFeatureCollection(zones));
       setSourceData(map, COMPOUNDS_SOURCE, compoundsToFeatureCollection(compounds));
       setSourceData(map, DRAFT_SOURCE, draftToFeatureCollection(draftRing));
-      setSourceData(map, PINS_SOURCE, pinsToFeatureCollection(sharedPins));
     };
     if (map.isStyleLoaded()) apply();
     else map.once('load', apply);
-  }, [zones, compounds, draftRing, sharedPins]);
+  }, [zones, compounds, draftRing]);
 
-  // Self marker + follow GPS
+  // Named family markers (self + shared members)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const pos = self ?? center;
-    if (!pos) {
-      selfMarkerRef.current?.remove();
-      selfMarkerRef.current = null;
-      return;
+    const wanted = new Map(sharedPins.map((p) => [p.id, p]));
+    const existing = memberMarkersRef.current;
+
+    for (const [id, marker] of existing) {
+      if (!wanted.has(id)) {
+        marker.remove();
+        existing.delete(id);
+      }
     }
 
-    if (!selfMarkerRef.current) {
-      selfMarkerRef.current = new maplibregl.Marker({
-        element: createSelfMarkerEl(t('family.mapYou')),
+    for (const pin of sharedPins) {
+      const prev = existing.get(pin.id);
+      if (prev) {
+        prev.setLngLat([pin.position.lng, pin.position.lat]);
+        continue;
+      }
+      const marker = new maplibregl.Marker({
+        element: createNamedMarkerEl(
+          pin.label,
+          pin.isSelf ? 'self' : 'member',
+        ),
         anchor: 'bottom',
       })
-        .setLngLat([pos.lng, pos.lat])
+        .setLngLat([pin.position.lng, pin.position.lat])
         .addTo(map);
-    } else {
-      selfMarkerRef.current.setLngLat([pos.lng, pos.lat]);
+      existing.set(pin.id, marker);
     }
+  }, [sharedPins]);
 
+  // Follow self GPS when present
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const pos = self ?? center;
+    if (!pos) return;
     map.easeTo({
       center: [pos.lng, pos.lat],
       zoom: Math.max(map.getZoom(), USER_ZOOM - 1),
       duration: 600,
     });
-  }, [self, center, t]);
+  }, [self, center]);
 
-  const emptyGps = !self && !center;
+  const emptyGps = !self && !center && sharedPins.length === 0;
 
   return (
     <div
@@ -489,6 +488,18 @@ export function FamilyGeoMap({
       ) : null}
       {interactive && drawMode === 'none' && compounds.length > 0 ? (
         <p className="oki-muted oki-geo-caption">{t('family.mapTapCompoundRemove')}</p>
+      ) : null}
+      {sharedPins.length > 0 ? (
+        <p className="oki-muted oki-geo-caption" role="status">
+          {t('family.mapMembersOnMap', { count: sharedPins.length })}
+        </p>
+      ) : null}
+      {connectedWithoutLocation.length > 0 ? (
+        <p className="oki-muted oki-geo-caption">
+          {t('family.mapConnectedNoLocation', {
+            names: connectedWithoutLocation.join(' · '),
+          })}
+        </p>
       ) : null}
       <p className="oki-muted oki-geo-caption">
         {t('family.mapOsmHint')} · {DEFAULT_MAP_STYLE.attribution}

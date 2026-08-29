@@ -1065,31 +1065,54 @@ h2,
   font-weight: 600;
 }
 
-.oki-map-self-marker {
+.oki-map-self-marker,
+.oki-map-name-marker {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.12rem;
   pointer-events: none;
+  z-index: 2;
 }
 
+.oki-map-self-dot,
+.oki-map-name-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2a7a6a;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.oki-map-name-marker--self .oki-map-name-dot,
 .oki-map-self-dot {
+  background: #0b3d3d;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
-  background: #0b3d3d;
-  border: 3px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-width: 3px;
 }
 
-.oki-map-self-label {
+.oki-map-self-label,
+.oki-map-name-label {
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.2;
   color: #0b3d3d;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 0.1rem 0.35rem;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 0.12rem 0.4rem;
   border-radius: 6px;
+  border: 1px solid rgba(13, 63, 60, 0.12);
   white-space: nowrap;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(20, 40, 40, 0.12);
+}
+
+.oki-map-name-marker--self .oki-map-name-label {
+  color: #062e2c;
+  border-color: rgba(13, 63, 60, 0.22);
 }
 
 .oki-map-actions {
