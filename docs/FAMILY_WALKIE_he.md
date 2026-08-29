@@ -1,44 +1,30 @@
-# אוקי משפחה — Family Walkie (אפליקציה נפרדת)
+# אוקי משפחה — מפרט מוצר (ריפו עצמאי)
 
-מפרט מורחב + **מרכז סוכנים:** [`apps/family/AGENTS.md`](../../apps/family/AGENTS.md) · [`docs/agents/OKI_FAMILY_he.md`](../agents/OKI_FAMILY_he.md)
+מרכז סוכנים: [`AGENTS.md`](../AGENTS.md) · פרומפט לסוכן חדש: [`AGENT_BOOTSTRAP_he.md`](AGENT_BOOTSTRAP_he.md)
 
-## נעילות מוצר (2026-08-26)
+## נעילות שהוחלטו עם הבעלים
 
-| # | החלטה |
+| # | נעילה |
 | --- | --- |
-| 1 | **אפליקציה נפרדת** עם מיתוג «אוקי משפחה» — `apps/family` (לא מודול בתוך TrailLink) |
-| 2 | **PTT = LiveKit** (כמו טיולים); נפילה להדגמה כשאין credentials |
-| 3 | **מיקום למנהל רק בבקשה + אישור** (לא שיתוף רציף) |
-| 4 | **PWA** מספיק לשלב ראשון |
+| 1 | **אפליקציה עצמאית** עם מיתוג «אוקי משפחה» (לא מודול בתוך TrailLink) |
+| 2 | **PTT = LiveKit** (נפילה להדגמה מקומית בלי credentials) |
+| 3 | **מיקום למנהל = רק בבקשה + אישור** (לא שיתוף רציף אוטומטי) |
+| 4 | לקוח ראשון = **PWA** |
+| 5 | **מתחמים סגורים** (≥3 נקודות); נראות/התראות **להורים בלבד** |
 
-## הרצה
+## יכולות ליבה
 
-```bash
-npm run dev:family
-# http://127.0.0.1:5174
-```
+- אוקי־אוקי משפחתי (החזק כדי לדבר)
+- אזורי האזנה (force audio)
+- מתחמי גדר סגורים + התראות כניסה/יציאה להורים
+- בקשת מיקום חד־פעמית מילד/חבר
 
-TrailLink (`עוד` → אוקי משפחה) מפנה לאפליקציה הנפרדת (`VITE_FAMILY_APP_URL` או localhost:5174).
+## ארכיטקטורה בקצרה
 
-## יכולות
-
-1. הרשאות מיקרופון + GPS (+ התראות)
-2. יצירת משפחה (מנהל) / הצטרפות בקוד
-3. PTT LiveKit או הדגמה (BroadcastChannel)
-4. מצב שקט — חסום באזורי `force_audio`
-5. אזורי GPS + קווי גבול עם התראות
-6. בקשת מיקום opt-in
-
-## Backend
-
-- Migration: `supabase/migrations/20260826000008_family_walkie.sql`
-- RPC: `supabase/migrations/20260826000009_family_walkie_rpcs.sql` (`create_oki_family` / `join_oki_family`)
+- PWA: `src/` (פורט 5174)
+- Domain: `src/lib/domain/familyWalkie.ts`
+- API: `src/lib/api/families.ts`
 - Edge: `supabase/functions/family-livekit-token`
-- Domain: `packages/domain/src/familyWalkie.ts`
-- API: `packages/api/src/families.ts` + `fetchFamilyLiveKitToken`
-- מרכז סוכנים: [`apps/family/AGENTS.md`](../../apps/family/AGENTS.md)
+- Migrations: `supabase/migrations/`
 
-
-## מפרט לייעוץ AI (עם צילומי מסך)
-
-[`oki-family-brief/OKI_FAMILY_SYSTEM_BRIEF_he.md`](./oki-family-brief/OKI_FAMILY_SYSTEM_BRIEF_he.md) · ZIP: [`oki-family-brief.tgz`](./oki-family-brief.tgz)
+TrailLink יכול להפנות לכאן דרך `VITE_FAMILY_APP_URL` (קישור בלבד).
