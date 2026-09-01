@@ -1,42 +1,22 @@
-# החלטות בעלים — פיצול אוקי (2026-08-29)
+# החלטות בעלים — פיצול אוקי
 
 | # | שאלה | בחירה | משמעות |
 | --- | --- | --- | --- |
-| 1 | ריפו GitHub | **ג** → **פתרון ביניים** | אין ריפו נפרד (טוקן הסוכן לא יכול ליצור). יש **ענף `oki-family`** ב־`maduel-cmd/TrailLink` עם תוכן הפרויקט העצמאי בלבד |
-| 2 | Netlify | **א** | אתר `oki-family-maduel` ← בנייה מ־`oki-family` (`npm run deploy:netlify`) |
-| 3 | Supabase | **א** | אותו פרויקט כמו TrailLink |
+| 1 | ריפו GitHub | **מוכן לדחיפה** | עץ עצמאי + ארכיון; יצירת `maduel-cmd/oki-family` דורשת פעולת בעלים — ראו `docs/SETUP_GITHUB_he.md` |
+| 2 | Netlify | **א** | אתר `oki-family-maduel` ← `npm run deploy:netlify` / חיבור לריפו החדש |
+| 3 | Supabase | **א** | אותו פרויקט כמו TrailLink (migrations ב־`supabase/`) |
 
-## GitHub — איך זה נראה בפועל
+## מצב נוכחי (הכנת ריפו נפרד)
 
-- **סטטוס סוכן:** ענף **`oki-family` פעיל** — סוכני Cloud עובדים ישירות על הענף הזה (שורש = אוקי משפחה בלבד).
-- ענף: https://github.com/maduel-cmd/TrailLink/tree/oki-family  
-- בשורש הענף: `package.json`, `src/`, `AGENTS.md` (לא מונוריפו TrailLink)
-- דחיפה מקומית:
+- תיקייה מקומית: `/home/ubuntu/oki-family`
+- ארכיון: `/opt/cursor/artifacts/oki-family-standalone.zip`
+- ענף ביניים ב-TrailLink: `oki-family`
+- הוראות: [`SETUP_GITHUB_he.md`](./SETUP_GITHUB_he.md)
 
-```bash
-cd oki-family
-git push traillink main:oki-family
-```
-
-### סוכן Cloud על הענף
-
-1. New Agent → ריפו **TrailLink**
-2. Branch / ref: **`oki-family`** (לא `master`)
-3. הדביקו פרומפט מ־`docs/AGENT_BOOTSTRAP_he.md`
-
-כשיהיה PAT אישי עם הרשאת `repo` — אפשר ליצור `maduel-cmd/oki-family` ולהעביר את ההיסטוריה (`git push` לריפו חדש).
-
-## פריסת Netlify
+## פקודת דחיפה אחרי `gh repo create`
 
 ```bash
-cd oki-family && npm run deploy:netlify
+git push git@github.com:maduel-cmd/oki-family.git main
+# או מ-TrailLink:
+# git push git@github.com:maduel-cmd/oki-family.git oki-family:main
 ```
-
-(האתר כרגע ב־manual deploy; אין קישור Git ב־Netlify UI.)
-
-## Netlify — Git vs CLI
-
-- פריסה פעילה ואמינה: `npm run deploy:netlify` (CLI) — **חובה על סוכן אחרי push**
-- חיבור Git ל־branch `oki-family` הוגדר + נוצר deploy key ב־Netlify
-- הוספת המפתח ל־GitHub דורשת `administration=write` — טוקן הסוכן **נדחה (403)**; Continuous Deploy מ־Git לא פעיל (`stop_builds=true`)
-- מפתח ציבורי שמור ב־`docs/NETLIFY_DEPLOY_KEY.pub` לשימוש עתידי אם תהיה הרשאה

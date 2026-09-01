@@ -24,3 +24,10 @@ npm run dev                  # http://127.0.0.1:5174
 ## סוכנים
 
 ראו [`AGENTS.md`](AGENTS.md) ו־[`docs/AGENT_BOOTSTRAP_he.md`](docs/AGENT_BOOTSTRAP_he.md).
+
+## ריפו GitHub
+
+הקוד מוכן לריפו עצמאי `maduel-cmd/oki-family`.
+יצירת הריפו: [`docs/SETUP_GITHUB_he.md`](docs/SETUP_GITHUB_he.md).
+
+עד אז: ענף ביניים https://github.com/maduel-cmd/TrailLink/tree/oki-family
