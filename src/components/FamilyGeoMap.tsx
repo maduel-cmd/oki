@@ -8,11 +8,12 @@ import {
   DEFAULT_MAP_STYLE,
   ensureMapRtlTextPlugin,
 } from '@oki/maps';
-import maplibregl, {
-  type GeoJSONSource,
-  type Map as MapLibreMap,
-  type MapMouseEvent,
-  type Marker,
+import * as maplibregl from 'maplibre-gl';
+import type {
+  GeoJSONSource,
+  Map as MapLibreMap,
+  MapMouseEvent,
+  Marker,
 } from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -17,7 +17,7 @@
     "@supabase/supabase-js": "^2.49.1",
     "i18next": "^24.2.3",
     "livekit-client": "^2.9.1",
-    "maplibre-gl": "^5.2.0",
+    "maplibre-gl": "^6.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.4.1"
