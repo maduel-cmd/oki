@@ -7,3 +7,5 @@ dist
 .DS_Store
 backups/
 .vite
+.tmp-*
+.tmp-chrome-maplibre-smoke/
