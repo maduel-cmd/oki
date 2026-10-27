@@ -8,6 +8,7 @@ import {
   DEFAULT_MAP_STYLE,
   ensureMapRtlTextPlugin,
 } from '@oki/maps';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import * as maplibregl from 'maplibre-gl';
 import type {
   GeoJSONSource,
@@ -15,9 +16,15 @@ import type {
   MapMouseEvent,
   Marker,
 } from 'maplibre-gl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+// MapLibre 6 ships an ESM worker; Vite must emit it as a hashed asset or the
+// default relative worker URL falls through the SPA to index.html.
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
+
+const MAP_UNSUPPORTED_MESSAGE = 'המפה לא נתמכת במכשיר הזה';
 
 /** Fallback when GPS is not ready yet (central Israel). */
 const FALLBACK_CENTER: LatLng = { lat: 31.7683, lng: 35.2137 };
@@ -330,6 +337,7 @@ export function FamilyGeoMap({
   const onCompoundClickRef = useRef(onCompoundClick);
   const drawModeRef = useRef(drawMode);
   const interactiveRef = useRef(interactive);
+  const [mapUnsupported, setMapUnsupported] = useState(false);
   onMapPickRef.current = onMapPick;
   onCompoundClickRef.current = onCompoundClick;
   drawModeRef.current = drawMode;
@@ -352,15 +360,29 @@ export function FamilyGeoMap({
       if (cancelled || !containerRef.current) return;
 
       const start = center ?? self ?? FALLBACK_CENTER;
-      map = new maplibregl.Map({
-        container: containerRef.current,
-        style: DEFAULT_MAP_STYLE.styleUrl,
-        center: [start.lng, start.lat],
-        zoom: self || center ? USER_ZOOM : FALLBACK_ZOOM,
-        attributionControl: { compact: true },
-      });
+      try {
+        map = new maplibregl.Map({
+          container: containerRef.current,
+          style: DEFAULT_MAP_STYLE.styleUrl,
+          center: [start.lng, start.lat],
+          zoom: self || center ? USER_ZOOM : FALLBACK_ZOOM,
+          attributionControl: { compact: true },
+        });
+      } catch (err) {
+        console.warn('[Oki] map init failed', err);
+        if (!cancelled) setMapUnsupported(true);
+        return;
+      }
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
       mapRef.current = map;
+
+      map.on('error', (e) => {
+        console.warn('[Oki] map error', e.error ?? e);
+        const msg = String(e.error?.message ?? e.error ?? e);
+        if (/worker|webgl|gpu/i.test(msg) && !cancelled) {
+          setMapUnsupported(true);
+        }
+      });
 
       map.on('load', () => {
         if (!map) return;
@@ -520,7 +542,12 @@ export function FamilyGeoMap({
         role="application"
         aria-label={t('family.mapTitle')}
       />
-      {emptyGps ? (
+      {mapUnsupported ? (
+        <p className="oki-geo-map-banner" role="alert">
+          {MAP_UNSUPPORTED_MESSAGE}
+        </p>
+      ) : null}
+      {!mapUnsupported && emptyGps ? (
         <p className="oki-muted oki-geo-map-banner">{t('family.mapNoGps')}</p>
       ) : null}
       {drawMode === 'zone' ? (
