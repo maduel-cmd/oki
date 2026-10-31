@@ -34,12 +34,16 @@ function PermCard({
   status,
   actionLabel,
   onAction,
+  busy,
+  optional,
 }: {
   title: string;
   body: string;
   status: string;
   actionLabel: string;
   onAction: () => void;
+  busy?: boolean;
+  optional?: boolean;
 }) {
   const { t } = useTranslation();
   const statusLabel =
@@ -47,7 +51,9 @@ function PermCard({
       ? t('family.permStatusOk')
       : status === 'denied'
         ? t('family.permStatusDenied')
-        : t('family.permStatusNeeded');
+        : optional
+          ? t('family.permStatusOptional')
+          : t('family.permStatusNeeded');
   return (
     <div className={`oki-perm-card oki-perm-card--${status}`}>
       <div>
@@ -56,8 +62,13 @@ function PermCard({
         <span className="oki-perm-status">{statusLabel}</span>
       </div>
       {status !== 'granted' ? (
-        <button type="button" className="oki-btn oki-btn--ghost" onClick={onAction}>
-          {actionLabel}
+        <button
+          type="button"
+          className="oki-btn oki-btn--ghost"
+          disabled={busy}
+          onClick={onAction}
+        >
+          {busy ? t('family.permRequesting') : actionLabel}
         </button>
       ) : null}
     </div>
@@ -85,7 +96,7 @@ function WelcomeGate() {
         <p className="oki-lead">{t('family.introHuman')}</p>
       </header>
 
-      {!fw.permissionsReady ? (
+      {!fw.permissionsReady || fw.demoMode ? (
         <div className="oki-section">
           <h2>{t('family.permissionsTitleHuman')}</h2>
           <p className="oki-muted">{t('family.permissionsHintHuman')}</p>
@@ -95,6 +106,7 @@ function WelcomeGate() {
               body={t('family.permMicWhy')}
               status={fw.permissions.microphone}
               actionLabel={t('family.enableMic')}
+              busy={fw.permissionsRequesting}
               onAction={() => void fw.requestPermissions()}
             />
             <PermCard
@@ -102,6 +114,7 @@ function WelcomeGate() {
               body={t('family.permGeoWhy')}
               status={fw.permissions.geolocation}
               actionLabel={t('family.enableGeo')}
+              busy={fw.permissionsRequesting}
               onAction={() => void fw.requestPermissions()}
             />
             <PermCard
@@ -109,9 +122,14 @@ function WelcomeGate() {
               body={t('family.permNotifyWhy')}
               status={fw.permissions.notifications}
               actionLabel={t('family.enableNotify')}
+              busy={fw.permissionsRequesting}
+              optional
               onAction={() => void fw.requestPermissions()}
             />
           </div>
+          {fw.demoMode ? (
+            <p className="oki-muted">{t('family.demoPermissionsHint')}</p>
+          ) : null}
           {fw.permissions.microphone === 'denied' ||
           fw.permissions.geolocation === 'denied' ? (
             <p className="oki-muted">{t('family.permBrowserHelp')}</p>
@@ -309,7 +327,9 @@ function RadioScreen() {
 
   const receiving = Boolean(fw.remoteSpeaker && !fw.pttActive);
   const busy = receiving;
-  const micBlocked = fw.permissions.microphone === 'denied';
+  // In local DEMO, missing mic hardware must not freeze the PTT button.
+  const micBlocked =
+    fw.permissions.microphone === 'denied' && !fw.demoMode;
 
   useEffect(() => {
     if (!fw.pttActive) {
@@ -449,7 +469,11 @@ function RadioScreen() {
             disabled={busy || micBlocked}
             onPointerDown={(e) => {
               e.preventDefault();
-              e.currentTarget.setPointerCapture(e.pointerId);
+              try {
+                e.currentTarget.setPointerCapture(e.pointerId);
+              } catch {
+                /* Synthetic / unsupported pointers — still start PTT. */
+              }
               beginPress();
             }}
             onPointerUp={endPress}
