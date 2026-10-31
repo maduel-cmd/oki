@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_ZONE_RADIUS_M,
+  FAMILY_INVITE_CODE_LEN,
   MIN_COMPOUND_POINTS,
+  filterInviteInput,
   type LatLng,
 } from '@oki/domain';
+import { cloudErrorI18nKey } from '@oki/api';
 import { dirForLocale, type AppLocale } from '@oki/i18n';
 import {
   FamilyGeoMap,
@@ -16,6 +19,13 @@ import { useLocale } from './state/locale';
 
 type TabId = 'radio' | 'family' | 'zones';
 type GateMode = 'choose' | 'create' | 'join';
+
+function CloudNotice({ code }: { code: string | null }) {
+  const { t } = useTranslation();
+  if (!code) return null;
+  const key = cloudErrorI18nKey(code);
+  return <p className="oki-error">{key ? t(key) : code}</p>;
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -172,7 +182,7 @@ function WelcomeGate() {
               placeholder={t('family.yourNamePlaceholder')}
             />
           </label>
-          {fw.cloudError ? <p className="oki-error">{fw.cloudError}</p> : null}
+          <CloudNotice code={fw.cloudError} />
           <button
             type="button"
             className="oki-btn oki-btn--large"
@@ -197,15 +207,16 @@ function WelcomeGate() {
             <input
               className="oki-invite-input"
               value={joinCode}
-              onChange={(e) =>
-                setJoinCode(
-                  e.target.value
-                    .toUpperCase()
-                    .replace(/[^A-Z0-9]/gi, '')
-                    .slice(0, 6),
-                )
-              }
-              placeholder="ABC123"
+              onChange={(e) => {
+                const field = filterInviteInput(e.target.value);
+                setJoinCode(field);
+                setJoinError(
+                  field.length > FAMILY_INVITE_CODE_LEN
+                    ? t('family.inviteTooLong')
+                    : null,
+                );
+              }}
+              placeholder="AB12CD / A1B2C3D4E5"
               autoCapitalize="characters"
               inputMode="text"
               dir="ltr"
@@ -225,8 +236,13 @@ function WelcomeGate() {
             className="oki-btn oki-btn--large"
             disabled={!fw.permissionsReady}
             onClick={() => {
-              void fw.joinFamily(joinCode, displayName).then((ok) => {
-                setJoinError(ok ? null : t('family.invalidCode'));
+              void fw.joinFamily(joinCode, displayName).then((result) => {
+                if (result.ok) {
+                  setJoinError(null);
+                  return;
+                }
+                const key = cloudErrorI18nKey(result.reason);
+                setJoinError(key ? t(key) : t('family.joinFailed'));
               });
             }}
           >
@@ -618,6 +634,15 @@ function FamilyTab() {
           ) : null}
         </div>
         <p className="oki-muted">{t('family.shareCodeHint')}</p>
+        {fw.isAdmin ? (
+          <button
+            type="button"
+            className="oki-btn oki-btn--ghost"
+            onClick={() => void fw.rotateInviteCode()}
+          >
+            {t('family.rotateInvite')}
+          </button>
+        ) : null}
       </div>
 
       <div className="oki-section">
@@ -1105,11 +1130,11 @@ function ActiveFamilyShell() {
               {t('family.connectedCount', { count: connectedCount })}
             </p>
           </div>
-          {fw.cloudError ? <p className="oki-error">{fw.cloudError}</p> : null}
+          <CloudNotice code={fw.cloudError} />
         </header>
-      ) : fw.cloudError ? (
-        <p className="oki-error">{fw.cloudError}</p>
-      ) : null}
+      ) : (
+        <CloudNotice code={fw.cloudError} />
+      )}
 
       <div className={`oki-active-body oki-active-body--${tab}`}>
         <div className="oki-radio-col">

@@ -1,12 +1,37 @@
 import {
   generateInviteCode,
   isValidInviteCode,
+  LEGACY_INVITE_CODE_LEN,
   normalizeInviteCode,
   type FamilyAlertKind,
   type FamilyRole,
   type LatLng,
 } from '../domain';
 import type { OkiClient } from './client';
+import { assertMembershipDeleted } from './familyRpc';
+
+export {
+  JOIN_OKI_FAMILY_RPC,
+  JOIN_OKI_FAMILY_V2_RPC,
+  JoinRejectedError,
+  ROTATE_OKI_INVITE_CODE_RPC,
+  cloudErrorI18nKey,
+  familyStateAfterLeave,
+  interpretJoinPayload,
+  isInvalidInviteRaise,
+  isMissingRpcError,
+  joinCloudFamily,
+  joinFailureReason,
+  leaveUiPlan,
+  rotateCloudInviteCode,
+  shouldUseOfflineFamily,
+} from './familyRpc';
+export type {
+  JoinFailureReason,
+  JoinFamilyResult,
+  JoinRejectionReason,
+  LeaveUiPlan,
+} from './familyRpc';
 
 export type CloudFamilyRow = {
   id: string;
@@ -219,8 +244,12 @@ export async function createCloudFamily(
   client: OkiClient,
   input: { name: string; displayName: string; inviteCode?: string },
 ): Promise<string> {
+  // create_oki_family still requires a unique 6-character p_invite_code and
+  // stores it. A constant placeholder collides (families.invite_code is unique)
+  // and a 10-character value is rejected until TrailLink #226. The screen shows
+  // the snapshot's families.invite_code, not this argument.
   const code = normalizeInviteCode(input.inviteCode ?? generateInviteCode());
-  if (!isValidInviteCode(code)) {
+  if (!isValidInviteCode(code) || code.length !== LEGACY_INVITE_CODE_LEN) {
     throw new Error('invalid_invite_code');
   }
   const { data, error } = await client.rpc('create_oki_family', {
@@ -230,23 +259,6 @@ export async function createCloudFamily(
   });
   if (error) throw error;
   if (typeof data !== 'string') throw new Error('create_oki_family_bad_result');
-  return data;
-}
-
-export async function joinCloudFamily(
-  client: OkiClient,
-  input: { inviteCode: string; displayName: string },
-): Promise<string> {
-  const code = normalizeInviteCode(input.inviteCode);
-  if (!isValidInviteCode(code)) {
-    throw new Error('invalid_invite_code');
-  }
-  const { data, error } = await client.rpc('join_oki_family', {
-    p_invite_code: code,
-    p_display_name: input.displayName,
-  });
-  if (error) throw error;
-  if (typeof data !== 'string') throw new Error('join_oki_family_bad_result');
   return data;
 }
 
@@ -412,12 +424,14 @@ export async function leaveCloudFamily(
   client: OkiClient,
   input: { familyId: string; userId: string },
 ): Promise<void> {
-  const { error } = await client
+  const { data, error } = await client
     .from('family_members')
     .delete()
     .eq('family_id', input.familyId)
-    .eq('user_id', input.userId);
+    .eq('user_id', input.userId)
+    .select('user_id');
   if (error) throw error;
+  assertMembershipDeleted(data);
 }
 
 export async function setCloudQuietPreferred(

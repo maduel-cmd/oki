@@ -21,8 +21,7 @@ import {
   isInForceAudioZone,
   isInsideZone,
   isValidCompoundRing,
-  isValidInviteCode,
-  normalizeInviteCode,
+  prepareJoinCode,
   shouldPlayIncomingPtt,
   type FamilyAlert,
   type FamilyBoundaryLine,
@@ -47,7 +46,12 @@ import {
   fetchMyCloudFamilyId,
   insertCloudFamilyAlert,
   joinCloudFamily,
+  joinFailureReason,
   leaveCloudFamily,
+  leaveUiPlan,
+  rotateCloudInviteCode,
+  shouldUseOfflineFamily,
+  type JoinFamilyResult,
   removeCloudBoundaryLine,
   removeCloudCompound,
   removeCloudMeetingPoint,
@@ -132,8 +136,9 @@ type FamilyContextValue = {
   cloudError: string | null;
   requestPermissions: () => Promise<boolean>;
   createFamily: (name: string, displayName: string) => Promise<void>;
-  joinFamily: (code: string, displayName: string) => Promise<boolean>;
+  joinFamily: (code: string, displayName: string) => Promise<JoinFamilyResult>;
   leaveFamily: () => Promise<void>;
+  rotateInviteCode: () => Promise<void>;
   setQuietPreferred: (value: boolean) => void;
   startPtt: () => Promise<void>;
   stopPtt: () => Promise<void>;
@@ -811,9 +816,19 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           );
           return;
         } catch (err) {
-          console.warn('[Oki] cloud create failed; local fallback', err);
-          setCloudError(err instanceof Error ? err.message : String(err));
+          console.warn('[Oki] cloud create failed', err);
+          setCloudError('create_failed');
+          return;
         }
+      }
+      if (
+        !shouldUseOfflineFamily({
+          serverConfigured: Boolean(client),
+          signedIn: Boolean(session?.user?.id),
+        })
+      ) {
+        setCloudError('not_signed_in');
+        return;
       }
       const id = uid('fam');
       const code = generateInviteCode();
@@ -847,11 +862,27 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   );
 
   const joinFamily = useCallback(
-    async (code: string, displayName: string): Promise<boolean> => {
-      const normalized = normalizeInviteCode(code);
-      if (!isValidInviteCode(normalized)) return false;
+    async (code: string, displayName: string): Promise<JoinFamilyResult> => {
+      const prepared = prepareJoinCode(code);
+      if (prepared.tooLong) {
+        setCloudError('too_long');
+        return { ok: false, reason: 'too_long' };
+      }
+      if (!prepared.submitCode) {
+        setCloudError('invalid_format');
+        return { ok: false, reason: 'invalid_format' };
+      }
+      const normalized = prepared.submitCode;
       setCloudError(null);
-      if (client && session?.user?.id) {
+      const offline = shouldUseOfflineFamily({
+        serverConfigured: Boolean(client),
+        signedIn: Boolean(session?.user?.id),
+      });
+      if (!offline) {
+        if (!client || !session?.user?.id) {
+          setCloudError('not_signed_in');
+          return { ok: false, reason: 'not_signed_in' };
+        }
         try {
           const familyId = await joinCloudFamily(client, {
             inviteCode: normalized,
@@ -862,15 +893,12 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           setFamily(
             snapshotToLocal(snap, session.user.id, prevPosRef.current),
           );
-          return true;
+          return { ok: true };
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
           console.warn('[Oki] cloud join failed', err);
-          setCloudError(msg);
-          // When signed in, do not invent a local family for a bad/missing code.
-          if (/family_not_found|invalid_invite|PGRST|RPC/i.test(msg)) {
-            return false;
-          }
+          const reason = joinFailureReason(err);
+          setCloudError(reason);
+          return { ok: false, reason };
         }
       }
       const memberId = session?.user?.id ?? uid('mem');
@@ -919,14 +947,18 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           alerts: [],
         };
       });
-      return true;
+      return { ok: true };
     },
     [client, session?.user?.id],
   );
 
   const leaveFamily = useCallback(async () => {
     const current = familyRef.current;
-    if (client && session?.user?.id && current && isUuid(current.id)) {
+    const attemptedServer = Boolean(
+      client && session?.user?.id && current && isUuid(current.id),
+    );
+    let leaveError: unknown | null = null;
+    if (attemptedServer && client && session?.user?.id && current) {
       try {
         await leaveCloudFamily(client, {
           familyId: current.id,
@@ -934,12 +966,32 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         });
       } catch (err) {
         console.warn('[Oki] cloud leave failed', err);
+        leaveError = err;
       }
+    }
+    const plan = leaveUiPlan({ attemptedServer, error: leaveError });
+    if (plan.showError) {
+      setCloudError('leave_failed');
+      return;
     }
     void tearDownLive();
     setFamily(null);
     setPttActive(false);
+    setCloudError(null);
   }, [client, session?.user?.id, tearDownLive]);
+
+  const rotateInviteCode = useCallback(async () => {
+    const current = familyRef.current;
+    if (!client || !session?.user?.id || !current || !isUuid(current.id)) return;
+    setCloudError(null);
+    try {
+      const code = await rotateCloudInviteCode(client, current.id);
+      setFamily((prev) => (prev ? { ...prev, inviteCode: code } : prev));
+    } catch (err) {
+      console.warn('[Oki] rotate invite failed', err);
+      setCloudError('rotate_failed');
+    }
+  }, [client, session?.user?.id]);
 
   const setQuietPreferred = useCallback(
     (value: boolean) => {
@@ -1463,6 +1515,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       createFamily,
       joinFamily,
       leaveFamily,
+      rotateInviteCode,
       setQuietPreferred,
       startPtt,
       stopPtt,
@@ -1499,6 +1552,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       createFamily,
       joinFamily,
       leaveFamily,
+      rotateInviteCode,
       setQuietPreferred,
       startPtt,
       stopPtt,

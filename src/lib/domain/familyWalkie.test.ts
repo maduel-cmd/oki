@@ -116,10 +116,60 @@ describe('zone transitions', () => {
 });
 
 describe('invite codes & helpers', () => {
-  it('normalizes and validates', () => {
+  it('accepts a legacy 6-character code', () => {
     assert.equal(normalizeInviteCode(' ab-12cd '), 'AB12CD');
     assert.equal(isValidInviteCode('AB12CD'), true);
+    assert.equal(isValidInviteCode('ab12cd'), true);
+  });
+
+  it('strips dots, en dashes, and em dashes', () => {
+    assert.equal(normalizeInviteCode('AB.12CD'), 'AB12CD');
+    assert.equal(isValidInviteCode('AB.12CD'), true);
+    assert.equal(normalizeInviteCode('AB\u201312CD'), 'AB12CD');
+    assert.equal(normalizeInviteCode('AB\u201412CD'), 'AB12CD');
+  });
+
+  it('keeps O, I, and L in a legacy 6-character code', () => {
+    assert.equal(normalizeInviteCode(' o-i l9x2 '), 'OIL9X2');
+    assert.equal(isValidInviteCode('OIL9X2'), true);
+    assert.equal(isValidInviteCode('oil234'), true);
+    assert.equal(normalizeInviteCode('AB12OI'), 'AB12OI');
+    assert.notEqual(normalizeInviteCode('OIL9X2'), '0119X2');
+  });
+
+  it('accepts a 10-character Crockford code', () => {
+    assert.equal(isValidInviteCode('0123456789'), true);
+    assert.equal(isValidInviteCode('ABCDEFGHJK'), true);
+    assert.equal(isValidInviteCode('abcdefghjk'), true);
+  });
+
+  it('maps Crockford lookalikes only for 10-character input', () => {
+    assert.equal(normalizeInviteCode('OOOOOOOOOO'), '0000000000');
+    assert.equal(normalizeInviteCode('IIIIIIIIII'), '1111111111');
+    assert.equal(normalizeInviteCode('LLLLLLLLLL'), '1111111111');
+    assert.equal(isValidInviteCode('ooiillmnpq'), true);
+    assert.equal(normalizeInviteCode('ooiillmnpq'), '001111MNPQ');
+    assert.equal(isValidInviteCode('ABCDEFGHJU'), false);
+  });
+
+  it('does not truncate a pasted 10-character code', () => {
+    const pasted = '7K2M-9P4Q 1R';
+    assert.equal(normalizeInviteCode(pasted), '7K2M9P4Q1R');
+    assert.equal(normalizeInviteCode(pasted).length, 10);
+    assert.equal(isValidInviteCode(pasted), true);
+    assert.equal(normalizeInviteCode('abcdefghjk'), 'ABCDEFGHJK');
+  });
+
+  it('rejects invalid lengths and characters', () => {
+    assert.equal(isValidInviteCode(''), false);
     assert.equal(isValidInviteCode('ab'), false);
+    assert.equal(isValidInviteCode('AB12C'), false);
+    assert.equal(isValidInviteCode('AB12CD9'), false);
+    assert.equal(isValidInviteCode('ABCDEFGHJ'), false);
+    assert.equal(isValidInviteCode('ABCDEFGHJKX'), false);
+    assert.equal(normalizeInviteCode('AB12C!'), 'AB12C');
+    assert.equal(isValidInviteCode('AB12C!'), false);
+    assert.equal(isValidInviteCode('ABCDEFGHJ$'), false);
   });
 
   it('generates 6-char codes', () => {
