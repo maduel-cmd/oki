@@ -278,15 +278,41 @@ export function isValidCompoundRing(ring: LatLng[]): boolean {
 }
 
 /**
- * Uppercase, then strip spaces and hyphens. Does not truncate.
+ * Uppercase, then strip every non-alphanumeric (spaces, hyphens, dots,
+ * en dashes, em dashes, and the rest). Does not truncate.
  * Crockford look-alike mapping (O→0, I and L→1) runs only when the stripped
- * value is 10 characters. A 6-character legacy code is returned unchanged,
+ * value is exactly 10 characters. A 6-character legacy code is unchanged,
  * so O, I, and L stay significant.
  */
 export function normalizeInviteCode(raw: string): string {
-  const stripped = raw.toUpperCase().replace(/[\s-]/g, '');
+  const stripped = raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
   if (stripped.length !== FAMILY_INVITE_CODE_LEN) return stripped;
   return stripped.replace(/O/g, '0').replace(/[IL]/g, '1');
+}
+
+/**
+ * Join field: uppercase and drop non-alphanumerics. Does not truncate and
+ * does not apply Crockford mapping — that happens in normalizeInviteCode
+ * at submit time, and only for a 10-character code.
+ */
+export function filterInviteInput(raw: string): string {
+  return raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
+}
+
+export function prepareJoinCode(raw: string): {
+  field: string;
+  tooLong: boolean;
+  submitCode: string | null;
+} {
+  const field = filterInviteInput(raw);
+  if (field.length > FAMILY_INVITE_CODE_LEN) {
+    return { field, tooLong: true, submitCode: null };
+  }
+  const submitCode = normalizeInviteCode(field);
+  if (!isValidInviteCode(submitCode)) {
+    return { field, tooLong: false, submitCode: null };
+  }
+  return { field, tooLong: false, submitCode };
 }
 
 export function isValidInviteCode(code: string): boolean {

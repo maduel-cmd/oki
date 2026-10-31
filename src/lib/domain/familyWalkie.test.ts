@@ -122,6 +122,13 @@ describe('invite codes & helpers', () => {
     assert.equal(isValidInviteCode('ab12cd'), true);
   });
 
+  it('strips dots, en dashes, and em dashes', () => {
+    assert.equal(normalizeInviteCode('AB.12CD'), 'AB12CD');
+    assert.equal(isValidInviteCode('AB.12CD'), true);
+    assert.equal(normalizeInviteCode('AB\u201312CD'), 'AB12CD');
+    assert.equal(normalizeInviteCode('AB\u201412CD'), 'AB12CD');
+  });
+
   it('keeps O, I, and L in a legacy 6-character code', () => {
     assert.equal(normalizeInviteCode(' o-i l9x2 '), 'OIL9X2');
     assert.equal(isValidInviteCode('OIL9X2'), true);
@@ -160,7 +167,7 @@ describe('invite codes & helpers', () => {
     assert.equal(isValidInviteCode('AB12CD9'), false);
     assert.equal(isValidInviteCode('ABCDEFGHJ'), false);
     assert.equal(isValidInviteCode('ABCDEFGHJKX'), false);
-    assert.equal(normalizeInviteCode('AB12C!'), 'AB12C!');
+    assert.equal(normalizeInviteCode('AB12C!'), 'AB12C');
     assert.equal(isValidInviteCode('AB12C!'), false);
     assert.equal(isValidInviteCode('ABCDEFGHJ$'), false);
   });

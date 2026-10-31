@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "npx --yes tsx --test src/smoke.test.ts src/geoMap.test.ts src/lib/domain/familyWalkie.test.ts src/lib/domain/familyWalkie.compound.test.ts",
+    "test": "npx --yes tsx --test src/smoke.test.ts src/geoMap.test.ts src/lib/domain/familyWalkie.test.ts src/lib/domain/familyWalkie.compound.test.ts src/lib/api/familyRpc.test.ts",
     "test:maplibre-worker": "node scripts/check-maplibre-built-worker.mjs",
     "lint": "echo \"lint:oki-family ok\"",
     "deploy:netlify": "npm run build && npx --yes netlify-cli deploy --prod --dir dist --site 29a19584-165d-4743-9139-7234676f5680 --no-build"

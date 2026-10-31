@@ -9,6 +9,29 @@ import {
 } from '../domain';
 import type { OkiClient } from './client';
 
+export {
+  JOIN_OKI_FAMILY_RPC,
+  JOIN_OKI_FAMILY_V2_RPC,
+  JoinRejectedError,
+  ROTATE_OKI_INVITE_CODE_RPC,
+  cloudErrorI18nKey,
+  familyStateAfterLeave,
+  interpretJoinPayload,
+  isInvalidInviteRaise,
+  isMissingRpcError,
+  joinCloudFamily,
+  joinFailureReason,
+  leaveUiPlan,
+  rotateCloudInviteCode,
+  shouldUseOfflineFamily,
+} from './familyRpc';
+export type {
+  JoinFailureReason,
+  JoinFamilyResult,
+  JoinRejectionReason,
+  LeaveUiPlan,
+} from './familyRpc';
+
 export type CloudFamilyRow = {
   id: string;
   name: string;
@@ -235,23 +258,6 @@ export async function createCloudFamily(
   });
   if (error) throw error;
   if (typeof data !== 'string') throw new Error('create_oki_family_bad_result');
-  return data;
-}
-
-export async function joinCloudFamily(
-  client: OkiClient,
-  input: { inviteCode: string; displayName: string },
-): Promise<string> {
-  const code = normalizeInviteCode(input.inviteCode);
-  if (!isValidInviteCode(code)) {
-    throw new Error('invalid_invite_code');
-  }
-  const { data, error } = await client.rpc('join_oki_family', {
-    p_invite_code: code,
-    p_display_name: input.displayName,
-  });
-  if (error) throw error;
-  if (typeof data !== 'string') throw new Error('join_oki_family_bad_result');
   return data;
 }
 
