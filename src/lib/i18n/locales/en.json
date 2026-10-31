@@ -105,7 +105,7 @@
     "createTitleHuman": "Create family",
     "createFamily": "Create family",
     "joinTitleHuman": "Join a family",
-    "inviteCodeHuman": "6-character code",
+    "inviteCodeHuman": "6- or 10-character code",
     "familyReady": "Family is ready",
     "shareCodeHint": "Share the code with your family.",
     "copyCode": "Copy",

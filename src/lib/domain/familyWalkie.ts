@@ -96,7 +96,17 @@ export type FamilyAlert = {
   position: LatLng | null;
 };
 
-export const FAMILY_INVITE_CODE_LEN = 6;
+/** New invite codes are 10 Crockford characters. The join field caps at this. */
+export const FAMILY_INVITE_CODE_LEN = 10;
+/**
+ * Codes issued before the Crockford migration. The current create_oki_family
+ * RPC still requires and stores exactly this length.
+ */
+export const LEGACY_INVITE_CODE_LEN = 6;
+
+/** Crockford base32: 0-9 and A-Z without I, L, O, U. */
+const CROCKFORD_CODE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{10}$/;
+const LEGACY_CODE = /^[A-Z0-9]{6}$/;
 export const DEFAULT_ZONE_RADIUS_M = 150;
 export const DEFAULT_LINE_ALERT_M = 40;
 export const MIN_ZONE_RADIUS_M = 50;
@@ -267,24 +277,38 @@ export function isValidCompoundRing(ring: LatLng[]): boolean {
   return ring.length >= MIN_COMPOUND_POINTS;
 }
 
-/** Normalize invite code: uppercase alphanumeric, fixed length. */
+/**
+ * Uppercase, then strip spaces and hyphens. Does not truncate.
+ * Crockford look-alike mapping (O→0, I and L→1) runs only when the stripped
+ * value is 10 characters. A 6-character legacy code is returned unchanged,
+ * so O, I, and L stay significant.
+ */
 export function normalizeInviteCode(raw: string): string {
-  return raw
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, FAMILY_INVITE_CODE_LEN);
+  const stripped = raw.toUpperCase().replace(/[\s-]/g, '');
+  if (stripped.length !== FAMILY_INVITE_CODE_LEN) return stripped;
+  return stripped.replace(/O/g, '0').replace(/[IL]/g, '1');
 }
 
 export function isValidInviteCode(code: string): boolean {
-  return /^[A-Z0-9]{6}$/.test(normalizeInviteCode(code));
+  const normalized = normalizeInviteCode(code);
+  if (normalized.length === LEGACY_INVITE_CODE_LEN) {
+    return LEGACY_CODE.test(normalized);
+  }
+  if (normalized.length === FAMILY_INVITE_CODE_LEN) {
+    return CROCKFORD_CODE.test(normalized);
+  }
+  return false;
 }
 
-/** Generate a short join code (browser/Node). */
+/**
+ * Six-character code for the pre-migration create_oki_family argument and for
+ * the offline demo. The current RPC rejects any other length and stores this
+ * value. Callers that have a server row display families.invite_code instead.
+ */
 export function generateInviteCode(random = Math.random): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
-  for (let i = 0; i < FAMILY_INVITE_CODE_LEN; i += 1) {
+  for (let i = 0; i < LEGACY_INVITE_CODE_LEN; i += 1) {
     out += alphabet[Math.floor(random() * alphabet.length)] ?? 'A';
   }
   return out;

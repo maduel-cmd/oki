@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_ZONE_RADIUS_M,
+  FAMILY_INVITE_CODE_LEN,
   MIN_COMPOUND_POINTS,
+  normalizeInviteCode,
   type LatLng,
 } from '@oki/domain';
 import { dirForLocale, type AppLocale } from '@oki/i18n';
@@ -197,15 +199,14 @@ function WelcomeGate() {
             <input
               className="oki-invite-input"
               value={joinCode}
-              onChange={(e) =>
-                setJoinCode(
-                  e.target.value
-                    .toUpperCase()
-                    .replace(/[^A-Z0-9]/gi, '')
-                    .slice(0, 6),
-                )
-              }
-              placeholder="ABC123"
+              onChange={(e) => {
+                const alnum = e.target.value
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/gi, '')
+                  .slice(0, FAMILY_INVITE_CODE_LEN);
+                setJoinCode(normalizeInviteCode(alnum));
+              }}
+              placeholder="A1B2C3D4E5"
               autoCapitalize="characters"
               inputMode="text"
               dir="ltr"

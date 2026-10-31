@@ -105,7 +105,7 @@
     "createTitleHuman": "إنشاء عائلة",
     "createFamily": "إنشاء العائلة",
     "joinTitleHuman": "الانضمام لعائلة",
-    "inviteCodeHuman": "رمز من 6 أحرف",
+    "inviteCodeHuman": "رمز من 6 أو 10 أحرف",
     "familyReady": "العائلة جاهزة",
     "shareCodeHint": "شارك الرمز مع أفراد العائلة.",
     "copyCode": "نسخ",

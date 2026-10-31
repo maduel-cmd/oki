@@ -1,6 +1,7 @@
 import {
   generateInviteCode,
   isValidInviteCode,
+  LEGACY_INVITE_CODE_LEN,
   normalizeInviteCode,
   type FamilyAlertKind,
   type FamilyRole,
@@ -219,8 +220,12 @@ export async function createCloudFamily(
   client: OkiClient,
   input: { name: string; displayName: string; inviteCode?: string },
 ): Promise<string> {
+  // create_oki_family still requires a unique 6-character p_invite_code and
+  // stores it. A constant placeholder collides (families.invite_code is unique)
+  // and a 10-character value is rejected until TrailLink #226. The screen shows
+  // the snapshot's families.invite_code, not this argument.
   const code = normalizeInviteCode(input.inviteCode ?? generateInviteCode());
-  if (!isValidInviteCode(code)) {
+  if (!isValidInviteCode(code) || code.length !== LEGACY_INVITE_CODE_LEN) {
     throw new Error('invalid_invite_code');
   }
   const { data, error } = await client.rpc('create_oki_family', {
