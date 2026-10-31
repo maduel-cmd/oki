@@ -118,6 +118,10 @@ type FamilyContextValue = {
   isAdmin: boolean;
   permissions: PermissionMap;
   permissionsReady: boolean;
+  /** True while a permission prompt / GPS read is in flight. */
+  permissionsRequesting: boolean;
+  /** Local DEMO (no Supabase) — gate / PTT work without hardware grants. */
+  demoMode: boolean;
   quietPreferred: boolean;
   quietEffective: boolean;
   forceAudioActive: boolean;
@@ -169,6 +173,40 @@ const DEFAULT_PERMISSIONS: PermissionMap = {
   geolocation: 'unknown',
   notifications: 'unknown',
 };
+
+/** Mic prompt / device enumeration can hang in some browsers — never block the UI forever. */
+const MIC_PERMISSION_TIMEOUT_MS = 8_000;
+const GEO_PERMISSION_TIMEOUT_MS = 12_000;
+/**
+ * Notification.requestPermission() hangs in Chromium when the prompt never surfaces
+ * (Playwright, blocked prompts, missing user-activation). Must not gate create/join/PTT.
+ */
+const NOTIFY_PERMISSION_TIMEOUT_MS = 2_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(fallback);
+    }, ms);
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
 
 function uid(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -299,7 +337,8 @@ function saveStored(state: StoredState): void {
 }
 
 export function FamilyProvider({ children }: { children: ReactNode }) {
-  const { client, session } = useAuth();
+  const { client, session, configured } = useAuth();
+  const demoMode = !configured;
   const selfFallbackId = session?.user?.id ?? 'local_self';
   const initial = useMemo(() => loadStored(selfFallbackId), [selfFallbackId]);
 
@@ -308,6 +347,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<PermissionMap>(
     initial.permissions,
   );
+  const [permissionsRequesting, setPermissionsRequesting] = useState(false);
   const [pttActive, setPttActive] = useState(false);
   const [pttMode, setPttMode] = useState<PttMode>('demo');
   const [pttConnected, setPttConnected] = useState(false);
@@ -327,6 +367,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   selfIdRef.current = selfId;
   const pttLiveRef = useRef(false);
   const pttBusyRef = useRef(false);
+  const permissionsRequestingRef = useRef(false);
 
   useEffect(() => {
     saveStored({ family, selfId, permissions });
@@ -483,60 +524,126 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   }, [evaluateGeoRules, updateSelf]);
 
   const requestPermissions = useCallback(async (): Promise<boolean> => {
-    const next: PermissionMap = { ...DEFAULT_PERMISSIONS };
+    if (permissionsRequestingRef.current) {
+      return hasRequiredPermissions(permissions) || demoMode;
+    }
+    permissionsRequestingRef.current = true;
+    setPermissionsRequesting(true);
+    const next: PermissionMap = { ...permissions };
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
-      next.microphone = 'granted';
-    } catch {
-      next.microphone = 'denied';
-    }
-
-    if ('geolocation' in navigator) {
-      await new Promise<void>((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            next.geolocation = 'granted';
-            const coords: LatLng = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-            };
-            prevPosRef.current = coords;
-            updateSelf({
-              position: coords,
-              lastSeenAt: new Date().toISOString(),
-            });
-            resolve();
-          },
-          () => {
-            next.geolocation = 'denied';
-            resolve();
-          },
-          { enableHighAccuracy: true, timeout: 12_000 },
-        );
-      });
-    } else {
-      next.geolocation = 'denied';
-    }
-
-    if ('Notification' in window) {
-      try {
-        const result = await Notification.requestPermission();
-        next.notifications =
-          result === 'granted'
-            ? 'granted'
-            : result === 'denied'
-              ? 'denied'
-              : 'prompt';
-      } catch {
-        next.notifications = 'denied';
+      // --- Microphone (required) ---
+      if (!navigator.mediaDevices?.getUserMedia) {
+        next.microphone = 'denied';
+      } else {
+        try {
+          const micPromise = navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          // Avoid unhandled rejection if the prompt resolves after our timeout.
+          void micPromise.then(
+            (stream) => {
+              stream.getTracks().forEach((t) => t.stop());
+            },
+            () => undefined,
+          );
+          const stream = await Promise.race([
+            micPromise,
+            new Promise<null>((resolve) => {
+              window.setTimeout(() => resolve(null), MIC_PERMISSION_TIMEOUT_MS);
+            }),
+          ]);
+          if (stream) {
+            stream.getTracks().forEach((t) => t.stop());
+            next.microphone = 'granted';
+          } else {
+            // Timed out waiting for prompt — keep asking, don't soft-lock the UI.
+            next.microphone =
+              next.microphone === 'granted' ? 'granted' : 'prompt';
+          }
+        } catch {
+          next.microphone = 'denied';
+        }
       }
-    }
+      setPermissions({ ...next });
 
-    setPermissions(next);
-    return hasRequiredPermissions(next);
-  }, [updateSelf]);
+      // --- Geolocation (required for zones; do not hang the gate) ---
+      if ('geolocation' in navigator) {
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+          const failTimer = window.setTimeout(() => {
+            next.geolocation =
+              next.geolocation === 'granted' ? 'granted' : 'prompt';
+            finish();
+          }, GEO_PERMISSION_TIMEOUT_MS + 500);
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              window.clearTimeout(failTimer);
+              next.geolocation = 'granted';
+              const coords: LatLng = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+              };
+              prevPosRef.current = coords;
+              updateSelf({
+                position: coords,
+                lastSeenAt: new Date().toISOString(),
+              });
+              finish();
+            },
+            () => {
+              window.clearTimeout(failTimer);
+              next.geolocation = 'denied';
+              finish();
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: GEO_PERMISSION_TIMEOUT_MS,
+              maximumAge: 5_000,
+            },
+          );
+        });
+      } else {
+        next.geolocation = 'denied';
+      }
+      setPermissions({ ...next });
+
+      // --- Notifications (optional) — NEVER block create/join/PTT ---
+      if (!('Notification' in window)) {
+        next.notifications = 'denied';
+      } else if (Notification.permission === 'granted') {
+        next.notifications = 'granted';
+      } else if (Notification.permission === 'denied') {
+        next.notifications = 'denied';
+      } else {
+        try {
+          const result = await withTimeout(
+            Notification.requestPermission(),
+            NOTIFY_PERMISSION_TIMEOUT_MS,
+            Notification.permission,
+          );
+          next.notifications =
+            result === 'granted'
+              ? 'granted'
+              : result === 'denied'
+                ? 'denied'
+                : 'prompt';
+        } catch {
+          next.notifications = 'prompt';
+        }
+      }
+      setPermissions({ ...next });
+      return hasRequiredPermissions(next) || demoMode;
+    } finally {
+      permissionsRequestingRef.current = false;
+      setPermissionsRequesting(false);
+    }
+  }, [demoMode, permissions, updateSelf]);
 
   // Local GPS watch for geofence/quiet — positions stay on-device until share.
   useEffect(() => {
@@ -996,15 +1103,57 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Mic-only grant for PTT — must not wait on GPS/notifications (those hung the talk button). */
+  const ensureMicrophone = useCallback(async (): Promise<boolean> => {
+    if (permissions.microphone === 'granted') return true;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setPermissions((prev) => ({ ...prev, microphone: 'denied' }));
+      return false;
+    }
+    try {
+      const micPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+      void micPromise.then(
+        (stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+        },
+        () => undefined,
+      );
+      const stream = await Promise.race([
+        micPromise,
+        new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), MIC_PERMISSION_TIMEOUT_MS);
+        }),
+      ]);
+      if (!stream) {
+        setPermissions((prev) => ({
+          ...prev,
+          microphone: prev.microphone === 'granted' ? 'granted' : 'prompt',
+        }));
+        return false;
+      }
+      stream.getTracks().forEach((t) => t.stop());
+      setPermissions((prev) => ({ ...prev, microphone: 'granted' }));
+      return true;
+    } catch {
+      setPermissions((prev) => ({ ...prev, microphone: 'denied' }));
+      return false;
+    }
+  }, [permissions.microphone]);
+
   const startPtt = useCallback(async () => {
     if (pttBusyRef.current) return;
+
     let micOk = permissions.microphone === 'granted';
-    if (!micOk) micOk = await requestPermissions();
-    if (!micOk) return;
+    // Never call full requestPermissions() here — geo/notification waits made PTT feel dead.
+    if (!micOk && !demoMode) {
+      micOk = await ensureMicrophone();
+      if (!micOk) return;
+    }
 
     pttBusyRef.current = true;
-    const liveOk = await ensureLiveKit();
     setPttActive(true);
+
+    const liveOk = micOk ? await ensureLiveKit() : false;
     if (liveOk && liveRef.current) {
       pttLiveRef.current = true;
       try {
@@ -1016,6 +1165,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       }
     } else {
       pttLiveRef.current = false;
+      setPttMode('demo');
       const current = familyRef.current;
       const me = current?.members.find((m) => m.id === selfIdRef.current);
       if (current && typeof BroadcastChannel !== 'undefined') {
@@ -1028,13 +1178,22 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         });
         bc.close();
       }
+      if (demoMode && !micOk) {
+        void playPttAutoTone(400);
+      }
     }
 
     if (pttTimerRef.current) clearTimeout(pttTimerRef.current);
     pttTimerRef.current = setTimeout(() => {
       void stopPtt();
     }, PTT_MAX_DURATION_MS);
-  }, [permissions.microphone, requestPermissions, ensureLiveKit, stopPtt]);
+  }, [
+    demoMode,
+    permissions.microphone,
+    ensureMicrophone,
+    ensureLiveKit,
+    stopPtt,
+  ]);
 
   const togglePtt = useCallback(async () => {
     if (pttActive) await stopPtt();
@@ -1446,7 +1605,10 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       self,
       isAdmin,
       permissions,
-      permissionsReady: hasRequiredPermissions(permissions),
+      // Local DEMO must not soft-lock create/join when hardware prompts hang or fail.
+      permissionsReady: hasRequiredPermissions(permissions) || demoMode,
+      permissionsRequesting,
+      demoMode,
       quietPreferred,
       quietEffective,
       forceAudioActive,
@@ -1485,6 +1647,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       self,
       isAdmin,
       permissions,
+      permissionsRequesting,
+      demoMode,
       quietPreferred,
       quietEffective,
       forceAudioActive,

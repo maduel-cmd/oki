@@ -9,3 +9,4 @@ backups/
 .vite
 .tmp-*
 .tmp-chrome-maplibre-smoke/
+.playwright-mcp/
