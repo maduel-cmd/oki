@@ -149,6 +149,13 @@ export function familyStateAfterLeave<T>(
   return plan.clearFamily ? null : family;
 }
 
+/** PostgREST delete succeeds with an empty body when zero rows match. */
+export function assertMembershipDeleted(data: unknown): void {
+  if (!Array.isArray(data) || data.length !== 1) {
+    throw new Error('leave_not_deleted');
+  }
+}
+
 export async function joinCloudFamily(
   client: OkiClient,
   input: { inviteCode: string; displayName: string },

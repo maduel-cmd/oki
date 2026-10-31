@@ -11,6 +11,7 @@ import {
   JoinRejectedError,
   ROTATE_OKI_INVITE_CODE_RPC,
   cloudErrorI18nKey,
+  assertMembershipDeleted,
   familyStateAfterLeave,
   joinCloudFamily,
   joinFailureReason,
@@ -18,6 +19,7 @@ import {
   rotateCloudInviteCode,
   shouldUseOfflineFamily,
 } from './familyRpc';
+import { leaveCloudFamily } from './families';
 
 const FAMILY_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -212,6 +214,44 @@ describe('leave', () => {
     assert.equal(plan.stopLocationSharing, true);
     assert.equal(plan.showError, false);
     assert.equal(familyStateAfterLeave(family, plan), null);
+  });
+});
+
+describe('leaveCloudFamily', () => {
+  function deleteClient(result: { data: unknown; error: { message: string } | null }) {
+    const builder = {
+      delete() {
+        return builder;
+      },
+      eq() {
+        return builder;
+      },
+      select() {
+        return Promise.resolve(result);
+      },
+    };
+    return { from: () => builder } as unknown as OkiClient;
+  }
+
+  it('resolves only when one membership row is deleted', async () => {
+    await leaveCloudFamily(
+      deleteClient({ data: [{ user_id: 'me' }], error: null }),
+      { familyId: FAMILY_ID, userId: 'me' },
+    );
+  });
+
+  it('fails when the delete matches no row', async () => {
+    await assert.rejects(
+      () =>
+        leaveCloudFamily(deleteClient({ data: [], error: null }), {
+          familyId: FAMILY_ID,
+          userId: 'me',
+        }),
+      (err: unknown) => err instanceof Error && err.message === 'leave_not_deleted',
+    );
+    assert.throws(() => assertMembershipDeleted(null), /leave_not_deleted/);
+    assert.throws(() => assertMembershipDeleted([]), /leave_not_deleted/);
+    assert.throws(() => assertMembershipDeleted([{ user_id: 'a' }, { user_id: 'b' }]), /leave_not_deleted/);
   });
 });
 

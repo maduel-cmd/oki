@@ -8,6 +8,7 @@ import {
   type LatLng,
 } from '../domain';
 import type { OkiClient } from './client';
+import { assertMembershipDeleted } from './familyRpc';
 
 export {
   JOIN_OKI_FAMILY_RPC,
@@ -423,12 +424,14 @@ export async function leaveCloudFamily(
   client: OkiClient,
   input: { familyId: string; userId: string },
 ): Promise<void> {
-  const { error } = await client
+  const { data, error } = await client
     .from('family_members')
     .delete()
     .eq('family_id', input.familyId)
-    .eq('user_id', input.userId);
+    .eq('user_id', input.userId)
+    .select('user_id');
   if (error) throw error;
+  assertMembershipDeleted(data);
 }
 
 export async function setCloudQuietPreferred(
