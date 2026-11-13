@@ -209,7 +209,20 @@
     "confirmRemoveMember": "Remove {{name}} from the family? Consider replacing the family code afterwards.",
     "newCode": "New code",
     "confirmNewCode": "Replace the family code? The old code will stop working.",
-    "privacyNote": "Location stays on the device and is sent to parents only after you approve. Calls are not recorded."
+    "privacyNote": "Location stays on the device and is sent to parents only after you approve. Calls are not recorded.",
+    "pendingTitle": "Waiting for approval",
+    "pendingBody": "Request sent. A parent in the family must approve you before you can listen and talk.",
+    "cancelRequest": "Cancel request",
+    "pendingBadge": "Waiting for approval",
+    "approve": "Approve",
+    "decline": "Decline",
+    "confirmDecline": "Decline {{name}}?",
+    "shareHour": "Share for 1 hour",
+    "sharingUntilBanner": "Your location is shared with parents until {{time}}",
+    "stopSharing": "Stop sharing",
+    "memberSharingUntil": "Sharing location until {{time}}",
+    "tooManyAttempts": "Too many attempts. Try again in an hour.",
+    "familyFull": "This family is full."
   },
   "auth": {
     "signUp": "Sign up",

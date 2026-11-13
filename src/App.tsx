@@ -19,6 +19,10 @@ const FamilyGeoMap = lazy(() =>
 type TabId = 'radio' | 'family' | 'zones';
 type GateMode = 'choose' | 'create' | 'join';
 
+function clock(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -226,7 +230,15 @@ function WelcomeGate() {
               placeholder={t('family.yourNamePlaceholder')}
             />
           </label>
-          {joinError ? <p className="oki-error">{joinError}</p> : null}
+          {joinError ? (
+            <p className="oki-error">
+              {/too_many_attempts/.test(fw.cloudError ?? '')
+                ? t('family.tooManyAttempts')
+                : /family_full/.test(fw.cloudError ?? '')
+                  ? t('family.familyFull')
+                  : joinError}
+            </p>
+          ) : null}
           <button
             type="button"
             className="oki-btn oki-btn--large"
@@ -509,7 +521,7 @@ function RadioScreen() {
           </div>
 
           <div className="oki-presence-strip" aria-label={t('family.membersTitle')}>
-            {fw.family?.members.map((m) => {
+            {fw.family?.members.filter((m) => m.approved).map((m) => {
               const speaking =
                 fw.remoteSpeaker?.id === m.id ||
                 (fw.pttActive && m.id === fw.self?.id);
@@ -581,6 +593,13 @@ function FamilyTab() {
                 <button
                   type="button"
                   className="oki-btn oki-btn--ghost"
+                  onClick={() => void fw.respondLocationRequest(r.id, true, 60)}
+                >
+                  {t('family.shareHour')}
+                </button>
+                <button
+                  type="button"
+                  className="oki-btn oki-btn--ghost"
                   onClick={() => void fw.respondLocationRequest(r.id, false)}
                 >
                   {t('family.denyLocationHuman')}
@@ -588,6 +607,19 @@ function FamilyTab() {
               </div>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {fw.sharingUntil ? (
+        <div className="oki-zone-banner oki-row" role="status">
+          <span>{t('family.sharingUntilBanner', { time: clock(fw.sharingUntil) })}</span>
+          <button
+            type="button"
+            className="oki-btn oki-btn--ghost"
+            onClick={() => void fw.stopSharing()}
+          >
+            {t('family.stopSharing')}
+          </button>
         </div>
       ) : null}
 
@@ -643,7 +675,9 @@ function FamilyTab() {
       <div className="oki-section">
         <h2>{t('family.membersTitle')}</h2>
         <ul className="oki-member-list">
-          {fw.family?.members.map((m) => {
+          {fw.family?.members
+            .filter((m) => m.approved || fw.isAdmin)
+            .map((m) => {
             const pendingReq = fw.family?.locationRequests.find(
               (r) => r.status === 'pending' && r.toMemberId === m.id,
             );
@@ -671,13 +705,19 @@ function FamilyTab() {
                       <strong>{m.displayName}</strong>
                     )}
                     <div className="oki-muted">
-                      {m.role === 'admin' ? t('family.roleAdmin') : t('family.roleMember')}
+                      {!m.approved
+                        ? t('family.pendingBadge')
+                        : m.role === 'admin'
+                          ? t('family.roleAdmin')
+                          : t('family.roleMember')}
                       {speaking ? ` · ${t('family.speakingBadge')}` : ''}
                       {m.quietPreferred ? ` · ${t('family.quietBadge')}` : ''}
                     </div>
-                    {fw.isAdmin && !isSelf ? (
+                    {fw.isAdmin && !isSelf && m.approved ? (
                       <div className="oki-muted">
-                        {m.sharedPosition
+                        {m.shareUntil && Date.parse(m.shareUntil) > Date.now()
+                          ? t('family.memberSharingUntil', { time: clock(m.shareUntil) })
+                          : m.sharedPosition
                           ? t('family.locationSharedNow')
                           : pendingReq
                             ? t('family.locationWaiting', { name: m.displayName })
@@ -710,7 +750,16 @@ function FamilyTab() {
                     </button>
                   )
                 ) : null}
-                {fw.isAdmin && !isSelf ? (
+                {fw.isAdmin && !isSelf && !m.approved ? (
+                  <button
+                    type="button"
+                    className="oki-btn"
+                    onClick={() => void fw.approveMember(m.id)}
+                  >
+                    {t('family.approve')}
+                  </button>
+                ) : null}
+                {fw.isAdmin && !isSelf && m.approved ? (
                   <button
                     type="button"
                     className="oki-btn oki-btn--ghost"
@@ -726,14 +775,16 @@ function FamilyTab() {
                     onClick={() => {
                       if (
                         window.confirm(
-                          t('family.confirmRemoveMember', { name: m.displayName }),
+                          m.approved
+                            ? t('family.confirmRemoveMember', { name: m.displayName })
+                            : t('family.confirmDecline', { name: m.displayName }),
                         )
                       ) {
                         void fw.removeMember(m.id);
                       }
                     }}
                   >
-                    {t('family.removeMember')}
+                    {m.approved ? t('family.removeMember') : t('family.decline')}
                   </button>
                 ) : null}
               </li>
@@ -816,6 +867,7 @@ function ZonesTab() {
   })();
 
   const connectedWithoutLocation = (fw.family?.members ?? [])
+    .filter((m) => m.approved)
     .filter((m) => {
       if (m.id === fw.self?.id) return !fw.position;
       if (!fw.isAdmin) return true; // members don't see others' coords
@@ -1145,7 +1197,7 @@ function ActiveFamilyShell() {
   const { t } = useTranslation();
   const fw = useFamily();
   const [tab, setTab] = useState<TabId>('radio');
-  const connectedCount = fw.family?.members.length ?? 0;
+  const connectedCount = fw.family?.members.filter((m) => m.approved).length ?? 0;
 
   return (
     <div className={`oki-active${tab === 'radio' ? ' oki-active--radio' : ''}`}>
@@ -1196,8 +1248,29 @@ function ActiveFamilyShell() {
   );
 }
 
+function PendingScreen() {
+  const { t } = useTranslation();
+  const fw = useFamily();
+  return (
+    <section className="oki-gate" role="status">
+      <header className="oki-gate-hero">
+        <h1>{t('family.pendingTitle')}</h1>
+        <p className="oki-lead">{t('family.pendingBody')}</p>
+      </header>
+      <button
+        type="button"
+        className="oki-btn oki-btn--ghost"
+        onClick={() => void fw.cancelJoinRequest()}
+      >
+        {t('family.cancelRequest')}
+      </button>
+    </section>
+  );
+}
+
 function HomeScreen() {
   const fw = useFamily();
+  if (!fw.family && fw.pendingApproval) return <PendingScreen />;
   if (!fw.family) return <WelcomeGate />;
   return <ActiveFamilyShell />;
 }
