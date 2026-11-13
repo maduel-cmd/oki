@@ -32,7 +32,8 @@ async function mintLiveKitToken(opts: {
     .setSubject(opts.identity)
     .setIssuedAt(now)
     .setNotBefore(now)
-    .setExpirationTime(now + 60 * 60)
+    // Short-lived: a removed member cannot reconnect after this window.
+    .setExpirationTime(now + 15 * 60)
     .setJti(crypto.randomUUID())
     .sign(secret);
 }
@@ -78,7 +79,7 @@ Deno.serve(async (req) => {
 
     const { data: member } = await supabase
       .from('family_members')
-      .select('family_id')
+      .select('family_id, display_name')
       .eq('family_id', familyId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
       identity: user.id,
       room,
       name:
+        (member.display_name as string | undefined) ??
         (user.user_metadata?.display_name as string | undefined) ??
         user.email ??
         user.id,
@@ -143,7 +145,8 @@ Deno.serve(async (req) => {
       { headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    console.error('[family-livekit-token]', e);
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });

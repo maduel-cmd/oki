@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_ZONE_RADIUS_M,
@@ -6,13 +6,15 @@ import {
   type LatLng,
 } from '@oki/domain';
 import { dirForLocale, type AppLocale } from '@oki/i18n';
-import {
-  FamilyGeoMap,
-  type FamilyMapDrawMode,
-} from './components/FamilyGeoMap';
+import type { FamilyMapDrawMode } from './components/FamilyGeoMap';
 import { useAuth } from './state/auth';
 import { useFamily } from './state/family';
 import { useLocale } from './state/locale';
+
+// MapLibre (~1 MB) loads only when the map tab is opened.
+const FamilyGeoMap = lazy(() =>
+  import('./components/FamilyGeoMap').then((m) => ({ default: m.FamilyGeoMap })),
+);
 
 type TabId = 'radio' | 'family' | 'zones';
 type GateMode = 'choose' | 'create' | 'join';
@@ -34,7 +36,9 @@ function PermCard({
   status,
   actionLabel,
   onAction,
+  optional = false,
 }: {
+  optional?: boolean;
   title: string;
   body: string;
   status: string;
@@ -47,7 +51,9 @@ function PermCard({
       ? t('family.permStatusOk')
       : status === 'denied'
         ? t('family.permStatusDenied')
-        : t('family.permStatusNeeded');
+        : optional
+          ? t('family.permStatusOptional')
+          : t('family.permStatusNeeded');
   return (
     <div className={`oki-perm-card oki-perm-card--${status}`}>
       <div>
@@ -80,9 +86,9 @@ function WelcomeGate() {
   return (
     <section className="oki-gate">
       <header className="oki-gate-hero">
-        <p className="oki-brand">{t('family.appBrand')}</p>
         <h1>{t('family.title')}</h1>
         <p className="oki-lead">{t('family.introHuman')}</p>
+        <p className="oki-muted">{t('family.privacyNote')}</p>
       </header>
 
       {!fw.permissionsReady ? (
@@ -108,6 +114,7 @@ function WelcomeGate() {
               title={t('family.permNotify')}
               body={t('family.permNotifyWhy')}
               status={fw.permissions.notifications}
+              optional
               actionLabel={t('family.enableNotify')}
               onAction={() => void fw.requestPermissions()}
             />
@@ -618,6 +625,19 @@ function FamilyTab() {
           ) : null}
         </div>
         <p className="oki-muted">{t('family.shareCodeHint')}</p>
+        {fw.isAdmin ? (
+          <button
+            type="button"
+            className="oki-btn oki-btn--ghost"
+            onClick={() => {
+              if (window.confirm(t('family.confirmNewCode'))) {
+                void fw.rotateInviteCode();
+              }
+            }}
+          >
+            {t('family.newCode')}
+          </button>
+        ) : null}
       </div>
 
       <div className="oki-section">
@@ -699,6 +719,23 @@ function FamilyTab() {
                     {t('family.askLocationHuman')}
                   </button>
                 ) : null}
+                {fw.isAdmin && !isSelf ? (
+                  <button
+                    type="button"
+                    className="oki-btn oki-btn--danger"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          t('family.confirmRemoveMember', { name: m.displayName }),
+                        )
+                      ) {
+                        void fw.removeMember(m.id);
+                      }
+                    }}
+                  >
+                    {t('family.removeMember')}
+                  </button>
+                ) : null}
               </li>
             );
           })}
@@ -723,7 +760,13 @@ function FamilyTab() {
         </div>
       )}
 
-      <button type="button" className="oki-btn oki-btn--ghost" onClick={() => void fw.leaveFamily()}>
+      <button
+        type="button"
+        className="oki-btn oki-btn--ghost"
+        onClick={() => {
+          if (window.confirm(t('family.confirmLeave'))) void fw.leaveFamily();
+        }}
+      >
         {t('family.leave')}
       </button>
     </div>
@@ -831,6 +874,7 @@ function ZonesTab() {
       <div className="oki-section">
         <h2>{t('family.mapTitleHuman')}</h2>
         <p className="oki-muted">{t('family.mapHintHuman')}</p>
+        <Suspense fallback={<div className="oki-map-loading" aria-busy="true" />}>
         <FamilyGeoMap
           center={fw.position}
           self={fw.position}
@@ -850,6 +894,7 @@ function ZonesTab() {
           sharedPins={mapPins}
           connectedWithoutLocation={connectedWithoutLocation}
         />
+        </Suspense>
         {fw.forceAudioZoneName ? (
           <p className="oki-zone-banner">
             {t('family.inZoneBanner', { zone: fw.forceAudioZoneName })}
@@ -1000,7 +1045,11 @@ function ZonesTab() {
                   <button
                     type="button"
                     className="oki-btn oki-btn--danger"
-                    onClick={() => void fw.removeZone(z.id)}
+                    onClick={() => {
+                      if (window.confirm(t('family.confirmRemoveZone'))) {
+                        void fw.removeZone(z.id);
+                      }
+                    }}
                   >
                     {t('family.remove')}
                   </button>
@@ -1069,7 +1118,11 @@ function ZonesTab() {
                   <button
                     type="button"
                     className="oki-btn oki-btn--danger"
-                    onClick={() => void fw.removeCompound(c.id)}
+                    onClick={() => {
+                      if (window.confirm(t('family.confirmRemoveCompound'))) {
+                        void fw.removeCompound(c.id);
+                      }
+                    }}
                   >
                     {t('family.remove')}
                   </button>

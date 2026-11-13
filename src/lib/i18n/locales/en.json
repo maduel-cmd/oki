@@ -82,7 +82,7 @@
       "quiet_blocked": "Quiet blocked in zone"
     },
     "introHuman": "Talk like a walkie-talkie — everyone hears. Quiet is allowed except in parent-defined zones.",
-    "demoBadge": "DEMO",
+    "demoBadge": "Local demo mode",
     "accountTitle": "Account",
     "accountHint": "Sign-in lets you talk across different devices.",
     "permissionsTitleHuman": "To get started",
@@ -186,7 +186,9 @@
       "zone_exit": "{{name}} left a zone",
       "location_shared": "{{name}} shared location",
       "quiet_blocked": "Quiet unavailable in zone for {{name}}",
-      "meeting_point": "New meeting point: {{name}}"
+      "meeting_point": "New meeting point: {{name}}",
+      "compound_enter": "Entered compound — {{name}}",
+      "compound_exit": "Left compound — {{name}}"
     },
     "editName": "Edit name",
     "saveName": "Save name",
@@ -199,7 +201,15 @@
     "mapCancelDraw": "Cancel marking",
     "mapTapZone": "Tap the map to place the alert zone center",
     "mapTapLine": "Tap the map for the boundary line start point",
-    "mapTapLineSecond": "Tap again for the line end point"
+    "mapTapLineSecond": "Tap again for the line end point",
+    "permStatusOptional": "Recommended",
+    "confirmLeave": "Leave the family? You will no longer hear the channel.",
+    "confirmRemoveZone": "Delete this zone?",
+    "removeMember": "Remove",
+    "confirmRemoveMember": "Remove {{name}} from the family? Consider replacing the family code afterwards.",
+    "newCode": "New code",
+    "confirmNewCode": "Replace the family code? The old code will stop working.",
+    "privacyNote": "Location stays on the device and is sent to parents only after you approve. Calls are not recorded."
   },
   "auth": {
     "signUp": "Sign up",

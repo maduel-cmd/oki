@@ -48,6 +48,8 @@ import {
   insertCloudFamilyAlert,
   joinCloudFamily,
   leaveCloudFamily,
+  removeCloudFamilyMember,
+  rotateCloudInviteCode,
   removeCloudBoundaryLine,
   removeCloudCompound,
   removeCloudMeetingPoint,
@@ -160,6 +162,10 @@ type FamilyContextValue = {
   requestMemberLocation: (memberId: string) => Promise<void>;
   respondLocationRequest: (requestId: string, accept: boolean) => Promise<void>;
   renameSelf: (displayName: string) => Promise<void>;
+  /** Admin only. */
+  removeMember: (memberId: string) => Promise<void>;
+  /** Admin only — old code stops working. */
+  rotateInviteCode: () => Promise<void>;
 };
 
 const FamilyContext = createContext<FamilyContextValue | null>(null);
@@ -432,17 +438,17 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       );
       for (const c of compoundTx.entered) {
         pushAlert({
-          kind: 'boundary_crossed',
+          kind: 'compound_enter',
           memberId,
-          label: `${memberName} · נכנס/ה למתחם ${c.name}`,
+          label: `${memberName} · ${c.name}`,
           position: next,
         });
       }
       for (const c of compoundTx.exited) {
         pushAlert({
-          kind: 'boundary_crossed',
+          kind: 'compound_exit',
           memberId,
-          label: `${memberName} · יצא/ה ממתחם ${c.name}`,
+          label: `${memberName} · ${c.name}`,
           position: next,
         });
       }
@@ -758,17 +764,17 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
             );
             for (const c of tx.entered) {
               pushAlert({
-                kind: 'boundary_crossed',
+                kind: 'compound_enter',
                 memberId: m.id,
-                label: `${m.displayName} · נכנס/ה למתחם ${c.name}`,
+                label: `${m.displayName} · ${c.name}`,
                 position: nextShared,
               });
             }
             for (const c of tx.exited) {
               pushAlert({
-                kind: 'boundary_crossed',
+                kind: 'compound_exit',
                 memberId: m.id,
-                label: `${m.displayName} · יצא/ה ממתחם ${c.name}`,
+                label: `${m.displayName} · ${c.name}`,
                 position: nextShared,
               });
             }
@@ -780,6 +786,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         setCloudError(null);
       } catch (err) {
         console.warn('[Oki] cloud refresh failed', err);
+        const code = (err as { code?: string } | null)?.code;
+        if (!cancelled && code === 'PGRST116') {
+          // Family row no longer visible: we were removed (or it was deleted).
+          setFamily(null);
+          setCloudError(null);
+          return;
+        }
         if (!cancelled) {
           setCloudError(err instanceof Error ? err.message : String(err));
         }
@@ -794,6 +807,51 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
     };
   }, [client, session?.user?.id, family?.id, pushAlert]);
+
+  /** System notification when the app is not in front (best effort, no push server). */
+  const notifiedRef = useRef<Set<string>>(new Set());
+  const notifPrimedRef = useRef(false);
+  useEffect(() => {
+    if (!family) {
+      notifiedRef.current = new Set();
+      notifPrimedRef.current = false;
+      return;
+    }
+    const items: { id: string; title: string; body: string }[] = [];
+    for (const r of family.locationRequests) {
+      if (r.status === 'pending' && r.toMemberId === selfId) {
+        const from =
+          family.members.find((m) => m.id === r.fromAdminId)?.displayName ?? '';
+        items.push({ id: `req:${r.id}`, title: family.name, body: `📍 ${from}` });
+      }
+    }
+    for (const a of family.alerts.slice(0, 10)) {
+      if (a.memberId === selfId) continue;
+      items.push({ id: `alert:${a.id}`, title: family.name, body: `🔔 ${a.label}` });
+    }
+    const fresh = items.filter((i) => !notifiedRef.current.has(i.id));
+    for (const i of items) notifiedRef.current.add(i.id);
+    // First pass after load only records what already exists.
+    if (!notifPrimedRef.current) {
+      notifPrimedRef.current = true;
+      return;
+    }
+    if (fresh.length === 0) return;
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    for (const i of fresh.slice(0, 3)) {
+      const opts = { body: i.body, tag: i.id, lang: document.documentElement.lang };
+      void (async () => {
+        try {
+          const reg = await navigator.serviceWorker?.getRegistration();
+          if (reg) await reg.showNotification(i.title, opts);
+          else new Notification(i.title, opts);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [family, selfId]);
 
   const createFamily = useCallback(
     async (name: string, displayName: string) => {
@@ -868,7 +926,11 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           console.warn('[Oki] cloud join failed', err);
           setCloudError(msg);
           // When signed in, do not invent a local family for a bad/missing code.
-          if (/family_not_found|invalid_invite|PGRST|RPC/i.test(msg)) {
+          if (
+            /family_not_found|invalid_invite|too_many_attempts|family_full|bad_result|PGRST|RPC/i.test(
+              msg,
+            )
+          ) {
             return false;
           }
         }
@@ -1440,6 +1502,47 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     [client, session?.user?.id, updateSelf],
   );
 
+  const removeMember = useCallback(
+    async (memberId: string) => {
+      const current = familyRef.current;
+      if (!current || memberId === selfIdRef.current) return;
+      if (client && isUuid(current.id)) {
+        try {
+          await removeCloudFamilyMember(client, {
+            familyId: current.id,
+            userId: memberId,
+          });
+        } catch (err) {
+          console.warn('[Oki] cloud removeMember failed', err);
+          setCloudError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+      }
+      setFamily((prev) =>
+        prev
+          ? { ...prev, members: prev.members.filter((m) => m.id !== memberId) }
+          : prev,
+      );
+    },
+    [client],
+  );
+
+  const rotateInviteCode = useCallback(async () => {
+    const current = familyRef.current;
+    if (!current) return;
+    let code = generateInviteCode();
+    if (client && isUuid(current.id)) {
+      try {
+        code = await rotateCloudInviteCode(client, current.id);
+      } catch (err) {
+        console.warn('[Oki] cloud rotate invite failed', err);
+        setCloudError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+    setFamily((prev) => (prev ? { ...prev, inviteCode: code } : prev));
+  }, [client]);
+
   const value = useMemo<FamilyContextValue>(
     () => ({
       family,
@@ -1479,6 +1582,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,
+      removeMember,
+      rotateInviteCode,
     }),
     [
       family,
@@ -1515,6 +1620,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,
+      removeMember,
+      rotateInviteCode,
     ],
   );
 
