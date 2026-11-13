@@ -1221,3 +1221,24 @@ h2,
     width: 13.5rem;
   }
 }
+
+/* Map chunk is lazy-loaded — reserve its space to avoid layout jump. */
+.oki-map-loading {
+  min-height: 18rem;
+  border-radius: 1rem;
+  background: rgba(11, 61, 61, 0.06);
+}
+
+/* Language picker: comfortable touch target. */
+.oki-topbar select {
+  min-height: 44px;
+}
+
+/* Family / zones tabs: don't stretch the header row, drop the empty radio column. */
+.oki-active:not(.oki-active--radio) {
+  align-content: start;
+}
+
+.oki-radio-col:empty {
+  display: none;
+}

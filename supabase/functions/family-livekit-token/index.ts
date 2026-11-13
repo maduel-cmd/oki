@@ -32,7 +32,8 @@ async function mintLiveKitToken(opts: {
     .setSubject(opts.identity)
     .setIssuedAt(now)
     .setNotBefore(now)
-    .setExpirationTime(now + 60 * 60)
+    // Short-lived: a removed member cannot reconnect after this window.
+    .setExpirationTime(now + 15 * 60)
     .setJti(crypto.randomUUID())
     .sign(secret);
 }
@@ -78,12 +79,13 @@ Deno.serve(async (req) => {
 
     const { data: member } = await supabase
       .from('family_members')
-      .select('family_id')
+      .select('family_id, display_name, approved')
       .eq('family_id', familyId)
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!member) {
+    // Pending members (waiting for a parent's approval) get no voice access.
+    if (!member || member.approved === false) {
       return new Response(JSON.stringify({ error: 'forbidden' }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
@@ -92,15 +94,19 @@ Deno.serve(async (req) => {
 
     const { data: family } = await supabase
       .from('families')
-      .select('livekit_room, invite_code')
+      .select('id')
       .eq('id', familyId)
-      .single();
+      .maybeSingle();
 
-    const room =
-      family?.livekit_room ??
-      (family?.invite_code
-        ? `family_${family.invite_code}`
-        : `family_${familyId}`);
+    if (!family) {
+      return new Response(JSON.stringify({ error: 'forbidden' }), {
+        status: 403,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+    // Room name comes only from the (unguessable, immutable) family id —
+    // never from a client-editable column or from the invite code.
+    const room = `oki_family_${familyId}`;
 
     const livekitUrl = Deno.env.get('LIVEKIT_URL');
     const apiKey = Deno.env.get('LIVEKIT_API_KEY');
@@ -127,6 +133,7 @@ Deno.serve(async (req) => {
       identity: user.id,
       room,
       name:
+        (member.display_name as string | undefined) ??
         (user.user_metadata?.display_name as string | undefined) ??
         user.email ??
         user.id,
@@ -143,7 +150,8 @@ Deno.serve(async (req) => {
       { headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    console.error('[family-livekit-token]', e);
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });

@@ -44,10 +44,15 @@ import {
   createCloudLocationRequest,
   fetchCloudFamilySnapshot,
   fetchFamilyLiveKitToken,
-  fetchMyCloudFamilyId,
+  fetchMyCloudMembership,
+  approveCloudFamilyMember,
+  shareCloudLocation,
+  stopCloudLocationSharing,
   insertCloudFamilyAlert,
   joinCloudFamily,
   leaveCloudFamily,
+  removeCloudFamilyMember,
+  rotateCloudInviteCode,
   removeCloudBoundaryLine,
   removeCloudCompound,
   removeCloudMeetingPoint,
@@ -80,6 +85,10 @@ export type FamilyMemberLocal = {
   /** Last location explicitly shared with admins (opt-in). */
   sharedPosition: LatLng | null;
   lastSeenAt: string | null;
+  /** false = joined with the code, waiting for a parent to approve. */
+  approved: boolean;
+  /** Trip mode: sharing location with parents until this ISO time. */
+  shareUntil: string | null;
 };
 
 export type FamilyGroupLocal = {
@@ -130,6 +139,10 @@ type FamilyContextValue = {
   alerts: FamilyAlert[];
   cloudSync: boolean;
   cloudError: string | null;
+  /** Signed-in user joined with a code and waits for a parent's approval. */
+  pendingApproval: boolean;
+  /** ISO time until which my location keeps flowing to parents, or null. */
+  sharingUntil: string | null;
   requestPermissions: () => Promise<boolean>;
   createFamily: (name: string, displayName: string) => Promise<void>;
   joinFamily: (code: string, displayName: string) => Promise<boolean>;
@@ -158,8 +171,19 @@ type FamilyContextValue = {
   addMeetingPoint: (input: { name: string; position: LatLng }) => Promise<void>;
   removeMeetingPoint: (meetingPointId: string) => Promise<void>;
   requestMemberLocation: (memberId: string) => Promise<void>;
-  respondLocationRequest: (requestId: string, accept: boolean) => Promise<void>;
+  respondLocationRequest: (
+    requestId: string,
+    accept: boolean,
+    shareMinutes?: number,
+  ) => Promise<void>;
+  stopSharing: () => Promise<void>;
+  approveMember: (memberId: string) => Promise<void>;
+  cancelJoinRequest: () => Promise<void>;
   renameSelf: (displayName: string) => Promise<void>;
+  /** Admin only. */
+  removeMember: (memberId: string) => Promise<void>;
+  /** Admin only — old code stops working. */
+  rotateInviteCode: () => Promise<void>;
 };
 
 const FamilyContext = createContext<FamilyContextValue | null>(null);
@@ -205,6 +229,8 @@ function snapshotToLocal(
         position: isSelf ? prevSelfPos : null,
         sharedPosition: shared,
         lastSeenAt: m.last_seen_at,
+        approved: m.approved !== false,
+        shareUntil: m.share_until ?? null,
       };
     }),
     zones: snap.zones.map((z) => ({
@@ -273,6 +299,8 @@ function loadStored(selfFallbackId: string): StoredState {
               ...m,
               displayName: normalizeDisplayName(m.displayName || ''),
               sharedPosition: m.sharedPosition ?? null,
+              approved: m.approved !== false,
+              shareUntil: m.shareUntil ?? null,
             })),
             compounds: parsed.family.compounds ?? [],
             meetingPoints: parsed.family.meetingPoints ?? [],
@@ -315,6 +343,12 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     null,
   );
   const [cloudError, setCloudError] = useState<string | null>(null);
+  const [pendingFamilyId, setPendingFamilyId] = useState<string | null>(null);
+  const lastSharePushRef = useRef(0);
+  const clientRef = useRef(client);
+  clientRef.current = client;
+  const sessionUserIdRef = useRef<string | null>(session?.user?.id ?? null);
+  sessionUserIdRef.current = session?.user?.id ?? null;
 
   const pttTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPosRef = useRef<LatLng | null>(null);
@@ -432,23 +466,57 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       );
       for (const c of compoundTx.entered) {
         pushAlert({
-          kind: 'boundary_crossed',
+          kind: 'compound_enter',
           memberId,
-          label: `${memberName} · נכנס/ה למתחם ${c.name}`,
+          label: `${memberName} · ${c.name}`,
           position: next,
         });
       }
       for (const c of compoundTx.exited) {
         pushAlert({
-          kind: 'boundary_crossed',
+          kind: 'compound_exit',
           memberId,
-          label: `${memberName} · יצא/ה ממתחם ${c.name}`,
+          label: `${memberName} · ${c.name}`,
           position: next,
         });
       }
     },
     [pushAlert],
   );
+
+  /**
+   * Trip mode: while the member's own approved window is open, keep the
+   * parents' copy of the location fresh (at most every 30 s).
+   */
+  const pushTripLocation = useCallback((next: LatLng) => {
+    const current = familyRef.current;
+    const me = current?.members.find((m) => m.id === selfIdRef.current);
+    if (!current || !me?.shareUntil) return;
+    if (Date.parse(me.shareUntil) <= Date.now()) return;
+    const now = Date.now();
+    if (now - lastSharePushRef.current < 30_000) return;
+    lastSharePushRef.current = now;
+    setFamily((prev) =>
+      prev
+        ? {
+            ...prev,
+            members: prev.members.map((m) =>
+              m.id === selfIdRef.current ? { ...m, sharedPosition: next } : m,
+            ),
+          }
+        : prev,
+    );
+    const c = clientRef.current;
+    const uid = sessionUserIdRef.current;
+    if (c && uid && isUuid(current.id)) {
+      void shareCloudLocation(c, {
+        familyId: current.id,
+        userId: uid,
+        position: next,
+        shareUntil: me.shareUntil,
+      }).catch((err) => console.warn('[Oki] trip share failed', err));
+    }
+  }, []);
 
   /** GPS for quiet/boundary only — never auto-shared with admins (decision 3A). */
   const refreshSelfGps = useCallback(async (): Promise<LatLng | null> => {
@@ -555,12 +623,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           lastSeenAt: new Date().toISOString(),
         });
         evaluateGeoRules(prev, next);
+        pushTripLocation(next);
       },
       () => undefined,
       { enableHighAccuracy: true, maximumAge: 5_000 },
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [family, permissions.geolocation, evaluateGeoRules, updateSelf]);
+  }, [family, permissions.geolocation, evaluateGeoRules, updateSelf, pushTripLocation]);
 
   // Demo cross-tab PTT when LiveKit unavailable
   useEffect(() => {
@@ -705,8 +774,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        const existingId = await fetchMyCloudFamilyId(client, session.user.id);
-        if (!existingId || cancelled) return;
+        const membership = await fetchMyCloudMembership(client, session.user.id);
+        if (!membership || cancelled) return;
+        if (!membership.approved) {
+          setPendingFamilyId(membership.familyId);
+          return;
+        }
+        const existingId = membership.familyId;
         const snap = await fetchCloudFamilySnapshot(client, existingId);
         if (cancelled) return;
         setSelfId(session.user.id);
@@ -725,6 +799,52 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [client, session?.user?.id]);
+
+  // Signed out → nothing is pending, and a cloud family must not stay on a
+  // (possibly shared) device: drop it from memory and from localStorage.
+  const hadSessionRef = useRef(false);
+  useEffect(() => {
+    if (session?.user?.id) {
+      hadSessionRef.current = true;
+      return;
+    }
+    setPendingFamilyId(null);
+    if (hadSessionRef.current) {
+      hadSessionRef.current = false;
+      setFamily((prev) => (prev && isUuid(prev.id) ? null : prev));
+    }
+  }, [session?.user?.id]);
+
+  /** While waiting for approval: poll own membership row only. */
+  useEffect(() => {
+    if (!client || !session?.user?.id || !pendingFamilyId) return;
+    const userId = session.user.id;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const membership = await fetchMyCloudMembership(client, userId);
+        if (cancelled) return;
+        if (!membership) {
+          // A parent declined (row deleted).
+          setPendingFamilyId(null);
+          return;
+        }
+        if (!membership.approved) return;
+        const snap = await fetchCloudFamilySnapshot(client, membership.familyId);
+        if (cancelled) return;
+        setSelfId(userId);
+        setFamily(snapshotToLocal(snap, userId, prevPosRef.current));
+        setPendingFamilyId(null);
+      } catch (err) {
+        console.warn('[Oki] pending check failed', err);
+      }
+    };
+    const timer = setInterval(() => void check(), 6_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [client, session?.user?.id, pendingFamilyId]);
 
   /** Poll cloud snapshot so location requests / members / alerts stay in sync. */
   useEffect(() => {
@@ -758,17 +878,17 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
             );
             for (const c of tx.entered) {
               pushAlert({
-                kind: 'boundary_crossed',
+                kind: 'compound_enter',
                 memberId: m.id,
-                label: `${m.displayName} · נכנס/ה למתחם ${c.name}`,
+                label: `${m.displayName} · ${c.name}`,
                 position: nextShared,
               });
             }
             for (const c of tx.exited) {
               pushAlert({
-                kind: 'boundary_crossed',
+                kind: 'compound_exit',
                 memberId: m.id,
-                label: `${m.displayName} · יצא/ה ממתחם ${c.name}`,
+                label: `${m.displayName} · ${c.name}`,
                 position: nextShared,
               });
             }
@@ -780,6 +900,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         setCloudError(null);
       } catch (err) {
         console.warn('[Oki] cloud refresh failed', err);
+        const code = (err as { code?: string } | null)?.code;
+        if (!cancelled && code === 'PGRST116') {
+          // Family row no longer visible: we were removed (or it was deleted).
+          setFamily(null);
+          setCloudError(null);
+          return;
+        }
         if (!cancelled) {
           setCloudError(err instanceof Error ? err.message : String(err));
         }
@@ -794,6 +921,56 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
     };
   }, [client, session?.user?.id, family?.id, pushAlert]);
+
+  /** System notification when the app is not in front (best effort, no push server). */
+  const notifiedRef = useRef<Set<string>>(new Set());
+  const notifPrimedRef = useRef(false);
+  useEffect(() => {
+    if (!family) {
+      notifiedRef.current = new Set();
+      notifPrimedRef.current = false;
+      return;
+    }
+    const items: { id: string; title: string; body: string }[] = [];
+    for (const r of family.locationRequests) {
+      if (r.status === 'pending' && r.toMemberId === selfId) {
+        const from =
+          family.members.find((m) => m.id === r.fromAdminId)?.displayName ?? '';
+        items.push({ id: `req:${r.id}`, title: family.name, body: `📍 ${from}` });
+      }
+    }
+    for (const m of family.members) {
+      if (!m.approved && m.id !== selfId) {
+        items.push({ id: `join:${m.id}`, title: family.name, body: `👋 ${m.displayName}` });
+      }
+    }
+    for (const a of family.alerts.slice(0, 10)) {
+      if (a.memberId === selfId) continue;
+      items.push({ id: `alert:${a.id}`, title: family.name, body: `🔔 ${a.label}` });
+    }
+    const fresh = items.filter((i) => !notifiedRef.current.has(i.id));
+    for (const i of items) notifiedRef.current.add(i.id);
+    // First pass after load only records what already exists.
+    if (!notifPrimedRef.current) {
+      notifPrimedRef.current = true;
+      return;
+    }
+    if (fresh.length === 0) return;
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    for (const i of fresh.slice(0, 3)) {
+      const opts = { body: i.body, tag: i.id, lang: document.documentElement.lang };
+      void (async () => {
+        try {
+          const reg = await navigator.serviceWorker?.getRegistration();
+          if (reg) await reg.showNotification(i.title, opts);
+          else new Notification(i.title, opts);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [family, selfId]);
 
   const createFamily = useCallback(
     async (name: string, displayName: string) => {
@@ -832,6 +1009,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
             quietPreferred: false,
             position: prevPosRef.current,
             sharedPosition: null,
+            approved: true,
+            shareUntil: null,
             lastSeenAt: new Date().toISOString(),
           },
         ],
@@ -857,6 +1036,14 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
             inviteCode: normalized,
             displayName: normalizeDisplayName(displayName),
           });
+          const membership = await fetchMyCloudMembership(
+            client,
+            session.user.id,
+          );
+          if (membership && !membership.approved) {
+            setPendingFamilyId(membership.familyId);
+            return true;
+          }
           const snap = await fetchCloudFamilySnapshot(client, familyId);
           setSelfId(session.user.id);
           setFamily(
@@ -868,9 +1055,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           console.warn('[Oki] cloud join failed', err);
           setCloudError(msg);
           // When signed in, do not invent a local family for a bad/missing code.
-          if (/family_not_found|invalid_invite|PGRST|RPC/i.test(msg)) {
-            return false;
-          }
+          // Signed in: never invent a local family when the cloud join fails.
+          return false;
         }
       }
       const memberId = session?.user?.id ?? uid('mem');
@@ -890,6 +1076,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
                 quietPreferred: false,
                 position: prevPosRef.current,
                 sharedPosition: null,
+                approved: true,
+                shareUntil: null,
                 lastSeenAt: new Date().toISOString(),
               },
             ],
@@ -908,6 +1096,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
               quietPreferred: false,
               position: prevPosRef.current,
               sharedPosition: null,
+              approved: true,
+              shareUntil: null,
               lastSeenAt: new Date().toISOString(),
             },
           ],
@@ -1343,8 +1533,14 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   );
 
   const respondLocationRequest = useCallback(
-    async (requestId: string, accept: boolean) => {
+    async (requestId: string, accept: boolean, shareMinutes = 0) => {
       const current = familyRef.current;
+      const shareUntil =
+        accept && shareMinutes > 0
+          ? new Date(
+              Date.now() + Math.min(shareMinutes, 180) * 60_000,
+            ).toISOString()
+          : null;
       if (!accept) {
         if (client && current && isUuid(current.id) && session?.user?.id) {
           try {
@@ -1379,6 +1575,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
             userId: session.user.id,
             accept: true,
             position: pos,
+            shareUntil,
           });
         } catch (err) {
           console.warn('[Oki] cloud share location failed', err);
@@ -1397,6 +1594,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
                   ...m,
                   sharedPosition: pos,
                   position: pos ?? m.position,
+                  shareUntil,
                 }
               : m,
           ),
@@ -1440,6 +1638,115 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     [client, session?.user?.id, updateSelf],
   );
 
+  const stopSharing = useCallback(async () => {
+    const current = familyRef.current;
+    updateSelf({ shareUntil: null, sharedPosition: null });
+    if (client && current && isUuid(current.id) && session?.user?.id) {
+      try {
+        await stopCloudLocationSharing(client, {
+          familyId: current.id,
+          userId: session.user.id,
+        });
+      } catch (err) {
+        console.warn('[Oki] stop sharing failed', err);
+      }
+    }
+  }, [client, session?.user?.id, updateSelf]);
+
+  const approveMember = useCallback(
+    async (memberId: string) => {
+      const current = familyRef.current;
+      if (!current) return;
+      if (client && isUuid(current.id)) {
+        try {
+          await approveCloudFamilyMember(client, {
+            familyId: current.id,
+            userId: memberId,
+          });
+        } catch (err) {
+          console.warn('[Oki] approve member failed', err);
+          setCloudError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+      }
+      setFamily((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.map((m) =>
+                m.id === memberId ? { ...m, approved: true } : m,
+              ),
+            }
+          : prev,
+      );
+    },
+    [client],
+  );
+
+  const cancelJoinRequest = useCallback(async () => {
+    const familyId = pendingFamilyId;
+    setPendingFamilyId(null);
+    if (client && session?.user?.id && familyId) {
+      try {
+        await leaveCloudFamily(client, { familyId, userId: session.user.id });
+      } catch (err) {
+        console.warn('[Oki] cancel join failed', err);
+      }
+    }
+  }, [client, pendingFamilyId, session?.user?.id]);
+
+  const removeMember = useCallback(
+    async (memberId: string) => {
+      const current = familyRef.current;
+      if (!current || memberId === selfIdRef.current) return;
+      if (client && isUuid(current.id)) {
+        try {
+          await removeCloudFamilyMember(client, {
+            familyId: current.id,
+            userId: memberId,
+          });
+        } catch (err) {
+          console.warn('[Oki] cloud removeMember failed', err);
+          setCloudError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+      }
+      setFamily((prev) =>
+        prev
+          ? { ...prev, members: prev.members.filter((m) => m.id !== memberId) }
+          : prev,
+      );
+    },
+    [client],
+  );
+
+  const rotateInviteCode = useCallback(async () => {
+    const current = familyRef.current;
+    if (!current) return;
+    let code = generateInviteCode();
+    if (client && isUuid(current.id)) {
+      try {
+        code = await rotateCloudInviteCode(client, current.id);
+      } catch (err) {
+        console.warn('[Oki] cloud rotate invite failed', err);
+        setCloudError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+    setFamily((prev) => (prev ? { ...prev, inviteCode: code } : prev));
+  }, [client]);
+
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!self?.shareUntil) return;
+    const id = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [self?.shareUntil]);
+  const sharingUntil =
+    self?.shareUntil && Date.parse(self.shareUntil) > nowTick
+      ? self.shareUntil
+      : null;
+
   const value = useMemo<FamilyContextValue>(
     () => ({
       family,
@@ -1459,6 +1766,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       alerts: family?.alerts ?? [],
       cloudSync: Boolean(family && isUuid(family.id)),
       cloudError,
+      pendingApproval: Boolean(pendingFamilyId) && !family,
+      sharingUntil,
       requestPermissions,
       createFamily,
       joinFamily,
@@ -1479,6 +1788,11 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,
+      removeMember,
+      rotateInviteCode,
+      stopSharing,
+      approveMember,
+      cancelJoinRequest,
     }),
     [
       family,
@@ -1515,6 +1829,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       requestMemberLocation,
       respondLocationRequest,
       renameSelf,
+      removeMember,
+      rotateInviteCode,
+      stopSharing,
+      approveMember,
+      cancelJoinRequest,
+      pendingFamilyId,
+      sharingUntil,
     ],
   );
 

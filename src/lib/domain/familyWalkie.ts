@@ -85,7 +85,9 @@ export type FamilyAlertKind =
   | 'zone_exit'
   | 'location_shared'
   | 'quiet_blocked'
-  | 'meeting_point';
+  | 'meeting_point'
+  | 'compound_enter'
+  | 'compound_exit';
 
 export type FamilyAlert = {
   id: string;
@@ -281,7 +283,16 @@ export function isValidInviteCode(code: string): boolean {
 }
 
 /** Generate a short join code (browser/Node). */
-export function generateInviteCode(random = Math.random): string {
+/** Uniform [0,1) from the platform CSPRNG (falls back to Math.random). */
+function secureRandom(): number {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c?.getRandomValues) {
+    return c.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
+  }
+  return Math.random();
+}
+
+export function generateInviteCode(random: () => number = secureRandom): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
   for (let i = 0; i < FAMILY_INVITE_CODE_LEN; i += 1) {

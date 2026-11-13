@@ -1,22 +1,15 @@
-# QA אחרון — 2026-08-29
+# QA אחרון — 2026-11-13
 
-## אוקי משפחה (`oki-family` / ענף `oki-family`)
+## אוקי משפחה (`maduel-cmd/oki`, ענף `claude/security-hardening-and-polish`)
 
 | בדיקה | תוצאה |
 | --- | --- |
 | `npm run typecheck` | GREEN |
-| `npm run test` | GREEN — 22/22 |
-| `npm run build` | GREEN |
-| HTTP local `:5174` | 200 |
-| HTTP prod `oki-family-maduel.netlify.app` | 200 |
+| `npm run test` | GREEN — 25/25 |
+| `npm run build` | GREEN (CSS ראשוני 90→19 kB; MapLibre נטען רק בלשונית אזורים) |
+| תרחישי אבטחה (`supabase/tests/security_hardening_scenarios.sql`) | GREEN — 19 תקיפות נחסמות; Postgres 16 מקומי, PostGIS מדומה |
+| CSP חדש מול ה-build | GREEN — ללא הפרות |
+| מעבר מסכים בדפדפן (מובייל 390px, מצב הדגמה) | GREEN — ללא שגיאות עמוד |
+| `npm audit` | 5 (2 low, 3 moderate) בתלויות פיתוח — פתוח |
 
-## TrailLink (מונוריפו)
-
-| בדיקה | תוצאה |
-| --- | --- |
-| `npm run typecheck` (כל ה־workspaces) | GREEN |
-| `npm run qa:unit` | GREEN |
-| `npm run lint` | GREEN (stubs) |
-| `npm run qa` (+ dev web על `:5173`) | GREEN — יחידות + OSRM + HTTP routes |
-
-אין כשלים לתיקון. פריסת Netlify לא נדרשה (אין שינוי קוד בסיבוב זה).
+לא נבדק: Supabase/LiveKit אמיתיים (אין לסוכן גישה לפרויקט), זרימת אישור הצטרפות ושיתוף לשעה מקצה לקצה, מכשיר פיזי, טעינת אריחי מפה. לא נפרס לפרוד.

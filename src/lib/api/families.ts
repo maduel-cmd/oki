@@ -27,6 +27,10 @@ export type CloudFamilyMemberRow = {
   last_lng: number | null;
   last_seen_at: string | null;
   joined_at: string;
+  /** false = waiting for a parent's approval. Missing before migration 12. */
+  approved?: boolean;
+  /** Trip mode: member keeps sharing location until this time. */
+  share_until?: string | null;
 };
 
 export type CloudFamilyZoneRow = {
@@ -85,6 +89,38 @@ export type CloudFamilySnapshot = {
     position: LatLng | null;
   }>;
 };
+
+export type CloudMemberLocationRow = {
+  user_id: string;
+  lat: number;
+  lng: number;
+  shared_at: string | null;
+  share_until?: string | null;
+};
+
+/**
+ * Shared locations live in `family_member_locations` (owner + admins only).
+ * Overlay them on member rows; the legacy `last_lat/last_lng` columns are
+ * always NULL after the hardening migration.
+ */
+export function mergeMemberLocations(
+  members: CloudFamilyMemberRow[],
+  locations: CloudMemberLocationRow[],
+): CloudFamilyMemberRow[] {
+  if (locations.length === 0) return members;
+  const byUser = new Map(locations.map((l) => [l.user_id, l]));
+  return members.map((m) => {
+    const loc = byUser.get(m.user_id);
+    if (!loc) return m;
+    return {
+      ...m,
+      last_lat: loc.lat,
+      last_lng: loc.lng,
+      last_seen_at: loc.shared_at ?? m.last_seen_at,
+      share_until: loc.share_until ?? null,
+    };
+  });
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -246,8 +282,85 @@ export async function joinCloudFamily(
     p_display_name: input.displayName,
   });
   if (error) throw error;
+  // The RPC returns NULL for an unknown code (so the attempt is rate-limited).
+  if (data == null) throw new Error('family_not_found');
   if (typeof data !== 'string') throw new Error('join_oki_family_bad_result');
   return data;
+}
+
+export type CloudMembership = { familyId: string; approved: boolean };
+
+/** Own membership row — visible even while waiting for approval. */
+export async function fetchMyCloudMembership(
+  client: OkiClient,
+  userId: string,
+): Promise<CloudMembership | null> {
+  const res = await client
+    .from('family_members')
+    .select('family_id, approved')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  if (res.error) {
+    // `approved` column missing (before migration 12) → everyone is approved.
+    const familyId = await fetchMyCloudFamilyId(client, userId);
+    return familyId ? { familyId, approved: true } : null;
+  }
+  if (!res.data) return null;
+  return {
+    familyId: res.data.family_id as string,
+    approved: res.data.approved !== false,
+  };
+}
+
+/** Admin: approve a pending member. */
+export async function approveCloudFamilyMember(
+  client: OkiClient,
+  input: { familyId: string; userId: string },
+): Promise<void> {
+  const { error } = await client
+    .from('family_members')
+    .update({ approved: true })
+    .eq('family_id', input.familyId)
+    .eq('user_id', input.userId);
+  if (error) throw error;
+}
+
+/** Write own location for the parents (one-off, or until `shareUntil`). */
+export async function shareCloudLocation(
+  client: OkiClient,
+  input: {
+    familyId: string;
+    userId: string;
+    position: LatLng;
+    shareUntil: string | null;
+  },
+): Promise<void> {
+  const { error } = await client.from('family_member_locations').upsert(
+    {
+      family_id: input.familyId,
+      user_id: input.userId,
+      lat: input.position.lat,
+      lng: input.position.lng,
+      shared_at: new Date().toISOString(),
+      share_until: input.shareUntil,
+    },
+    { onConflict: 'family_id,user_id' },
+  );
+  if (error) throw error;
+}
+
+/** Stop trip-mode sharing and erase the shared point. */
+export async function stopCloudLocationSharing(
+  client: OkiClient,
+  input: { familyId: string; userId: string },
+): Promise<void> {
+  const { error } = await client
+    .from('family_member_locations')
+    .delete()
+    .eq('family_id', input.familyId)
+    .eq('user_id', input.userId);
+  if (error) throw error;
 }
 
 export async function fetchMyCloudFamilyId(
@@ -277,6 +390,7 @@ export async function fetchCloudFamilySnapshot(
     meetingsRes,
     reqRes,
     alertsRes,
+    locationsRes,
   ] = await Promise.all([
     client.from('families').select('*').eq('id', familyId).single(),
     client.from('family_members').select('*').eq('family_id', familyId),
@@ -295,6 +409,11 @@ export async function fetchCloudFamilySnapshot(
       .eq('family_id', familyId)
       .order('created_at', { ascending: false })
       .limit(50),
+    // RLS: a member sees only their own row; admins see the whole family.
+    client
+      .from('family_member_locations')
+      .select('user_id, lat, lng, shared_at, share_until')
+      .eq('family_id', familyId),
   ]);
 
   if (familyRes.error) throw familyRes.error;
@@ -320,7 +439,11 @@ export async function fetchCloudFamilySnapshot(
   if (alertsRes.error) throw alertsRes.error;
 
   const family = familyRes.data as CloudFamilyRow;
-  const members = (membersRes.data ?? []) as CloudFamilyMemberRow[];
+  const members = mergeMemberLocations(
+    (membersRes.data ?? []) as CloudFamilyMemberRow[],
+    // Table may be missing before migration 20261113000011 — treat as empty.
+    locationsRes.error ? [] : ((locationsRes.data ?? []) as CloudMemberLocationRow[]),
+  );
 
   const zones = (zonesRes.data ?? [])
     .map((z) => {
@@ -611,6 +734,8 @@ export async function respondCloudLocationRequest(
     userId: string;
     accept: boolean;
     position: LatLng | null;
+    /** ISO time until which the member keeps sharing; null = one-off. */
+    shareUntil?: string | null;
   },
 ): Promise<void> {
   const { error } = await client
@@ -623,16 +748,47 @@ export async function respondCloudLocationRequest(
   if (error) throw error;
 
   if (input.accept && input.position) {
-    const { error: memErr } = await client
-      .from('family_members')
-      .update({
-        last_lat: input.position.lat,
-        last_lng: input.position.lng,
-        last_seen_at: new Date().toISOString(),
-      })
-      .eq('family_id', input.familyId)
-      .eq('user_id', input.userId);
-    if (memErr) throw memErr;
+    await shareCloudLocation(client, {
+      familyId: input.familyId,
+      userId: input.userId,
+      position: input.position,
+      shareUntil: input.shareUntil ?? null,
+    });
+  }
+}
+
+/** Admin: replace the invite code. Returns the new code. */
+export async function rotateCloudInviteCode(
+  client: OkiClient,
+  familyId: string,
+): Promise<string> {
+  const { data, error } = await client.rpc('rotate_oki_invite_code', {
+    p_family_id: familyId,
+  });
+  if (error) throw error;
+  if (typeof data !== 'string') throw new Error('rotate_invite_bad_result');
+  return data;
+}
+
+/**
+ * Admin: remove another member (RLS allows admin deletes), then ask the
+ * server to drop them from the live voice room (best effort).
+ */
+export async function removeCloudFamilyMember(
+  client: OkiClient,
+  input: { familyId: string; userId: string },
+): Promise<void> {
+  const { error } = await client
+    .from('family_members')
+    .delete()
+    .eq('family_id', input.familyId)
+    .eq('user_id', input.userId);
+  if (error) throw error;
+  const kick = await client.functions.invoke('family-kick-member', {
+    body: { familyId: input.familyId, userId: input.userId },
+  });
+  if (kick.error) {
+    console.warn('[Oki] family-kick-member failed', kick.error.message);
   }
 }
 

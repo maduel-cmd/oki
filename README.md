@@ -16,10 +16,15 @@ npm run dev                  # http://127.0.0.1:5174
 
 ## פריסה
 
-- Netlify אתר: `oki-family-maduel` — מפריסים מ־`oki-family/dist` (`npm run deploy:netlify`)
-- בעלים נעל: תיקייה מקומית בינתיים (בלי GitHub); אותו Supabase כמו TrailLink — ראו `docs/OWNER_DECISIONS_he.md`
-- Supabase: מיגרציות ב־`supabase/migrations/` (אם חסר בפרויקט הקיים)
+- Netlify: אתר `oki-family-maduel` — `npm run deploy:netlify`
+- Supabase: מיגרציות ב־`supabase/migrations/` (אותו פרויקט כמו TrailLink — ראו `docs/OWNER_DECISIONS_he.md`)
 - LiveKit: secrets ב־Edge Function `family-livekit-token`
+- סדר פריסה אחרי שינוי סכימה: DB ← Edge ← Netlify
+
+## אבטחה ופרטיות
+
+הקשחת 2026-11-13 והכרעות פתוחות: [`docs/DECISIONS_2026-11-13_he.md`](docs/DECISIONS_2026-11-13_he.md).
+תרחישי בדיקה ל־RLS: `supabase/tests/security_hardening_scenarios.sql`.
 
 ## סוכנים
 
@@ -27,7 +32,4 @@ npm run dev                  # http://127.0.0.1:5174
 
 ## ריפו GitHub
 
-הקוד מוכן לריפו עצמאי `maduel-cmd/oki-family`.
-יצירת הריפו: [`docs/SETUP_GITHUB_he.md`](docs/SETUP_GITHUB_he.md).
-
-עד אז: ענף ביניים https://github.com/maduel-cmd/TrailLink/tree/oki-family
+`maduel-cmd/oki` (ריפו עצמאי).
